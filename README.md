@@ -61,4 +61,15 @@ npm run dev
 | `npm test` | Run the unit tests (Vitest) |
 
 ## Deploy
-Deployed on Render as a static site: build command `npm install && npm run build`, publish directory `dist`. Every push to `main` redeploys automatically.
+
+Deployed on Render as a static site: build command `npm install && npm run build`, publish directory `dist`.
+
+Deploys are driven by GitHub Actions rather than Render's own auto-deploy, so a push only reaches the site after the tests pass. On a push to `main`, the `deploy` job POSTs to the service's Render **Deploy Hook**.
+
+It needs one secret. Without it the job logs a warning and skips, so nothing breaks until it is set:
+
+1. Render dashboard → **todo-app** → Settings → **Deploy Hook**, copy the URL
+2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**
+3. Name it `RENDER_DEPLOY_HOOK`, paste the URL
+
+A `4xx` from Render fails the job immediately with a message pointing at the hook URL; a network blip or `5xx` is retried three times with backoff.

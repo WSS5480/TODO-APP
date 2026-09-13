@@ -23,3 +23,57 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Render's own auto-deploy has never fired for this service, so the deploy is
+  # driven from here instead: only after the tests above pass, and only for main.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # never let two deploys of main race each other
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: false
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HOOK:-}" ]; then
+            echo "::warning title=Deploy skipped::RENDER_DEPLOY_HOOK is not set."
+            echo "Add the service's Deploy Hook URL (Render dashboard ->"
+            echo "todo-app -> Settings -> Deploy Hook) as a repository secret"
+            echo "named RENDER_DEPLOY_HOOK, then re-run this workflow."
+            exit 0
+          fi
+
+          # Retry a network blip or a 5xx; a 4xx means the hook URL itself is
+          # wrong, which retrying cannot fix, so fail fast and say so.
+          for attempt in 1 2 3; do
+            rm -f response.txt   # never report a previous attempt's body
+            code=$(curl -sS --max-time 30 -o response.txt -w '%{http_code}' -X POST "$HOOK" || echo 000)
+
+            case "$code" in
+              2*)
+                echo "Render accepted the deploy (HTTP $code)."
+                if [ -s response.txt ]; then cat response.txt; fi
+                exit 0
+                ;;
+              4*)
+                echo "::error title=Deploy rejected::Render returned HTTP $code. Check that RENDER_DEPLOY_HOOK holds the current Deploy Hook URL."
+                if [ -s response.txt ]; then cat response.txt; fi
+                exit 1
+                ;;
+              *)
+                echo "Attempt $attempt failed (HTTP $code)."
+                if [ -s response.txt ]; then cat response.txt; fi
+                ;;
+            esac
+
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 5)); fi
+          done
+
+          echo "::error title=Deploy failed::Render did not accept the deploy hook after 3 attempts."
+          exit 1
