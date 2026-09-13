@@ -26,6 +26,8 @@ const taskSoundEl = $("taskSound");
 const updateEl = $("update");
 const updateBtn = $("updateBtn");
 const updateDismiss = $("updateDismiss");
+const settingsBtn = $("settingsBtn");
+const settingsPanel = $("settingsPanel");
 
 const BASE_TITLE = document.title;
 const SNOOZE_MIN = 10;
@@ -57,6 +59,25 @@ function focusEdit() {
 }
 
 /* ---------- settings ---------- */
+
+// Settings and the sound samples live behind the gear, so the day-to-day view
+// is just the add form and the list.
+function setSettingsOpen(open) {
+  settingsPanel.hidden = !open;
+  settingsBtn.setAttribute("aria-expanded", String(open));
+  settingsBtn.classList.toggle("on", open);
+}
+
+settingsBtn.addEventListener("click", () => {
+  const open = settingsPanel.hidden;
+  setSettingsOpen(open);
+  // opening is a gesture, so it is a good moment to prime the alarm sounds
+  if (open) unlockAudio(soundsInUse());
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !settingsPanel.hidden && !editingId) setSettingsOpen(false);
+});
 
 // One source of truth for the sound list: the library in sound.js.
 function fillSounds(select, { withDefault = false } = {}) {
