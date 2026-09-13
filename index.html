@@ -48,12 +48,6 @@
           <option value="60">1 hour before</option>
         </select>
       </label>
-      <label class="lead">Alarm
-        <select id="dueSound" title="Sound when a task is due"></select>
-      </label>
-      <label class="lead">Heads-up sound
-        <select id="soonSound" title="Sound for the early warning"></select>
-      </label>
       <label class="lead">Repeat
         <select id="repeat" title="How many times a due alarm rings">
           <option value="1" selected>once</option>
@@ -64,6 +58,19 @@
       </label>
       <button class="ghost" id="notifyBtn" type="button">Enable notifications</button>
     </div>
+    <!-- tap a sound to pick it and hear it; chips beat a dropdown on a phone -->
+    <details class="sounds" id="soundPanel">
+      <summary>Alarm sounds</summary>
+      <div class="sound-group">
+        <span class="sound-label">When a task is due</span>
+        <div class="sound-picker" id="dueSound" role="radiogroup" aria-label="Alarm sound"></div>
+      </div>
+      <div class="sound-group">
+        <span class="sound-label">Heads-up warning</span>
+        <div class="sound-picker" id="soonSound" role="radiogroup" aria-label="Heads-up sound"></div>
+      </div>
+      <p class="sound-hint">Tap any sound to hear it.</p>
+    </details>
     <div class="toolbar">
       <span id="count">0 active</span>
       <button class="ghost" id="clearBtn" type="button">Clear done</button>

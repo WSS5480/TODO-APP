@@ -11,7 +11,8 @@ Live: https://todo-app-qpd5.onrender.com
 - Add / complete / delete tasks
 - **Edit a task** in place — change its title, due time or priority (Escape or Cancel backs out)
 - Optional due date & time with priority (low / med / high)
-- **Four alarm sounds** — Chime, Bell, Ping and Urgent, all synthesized in-app (no audio files); picking one previews it
+- **Eight alarm sounds** — Chime, Bell, Ping, Urgent, Marimba, Digital, Klaxon and Soft, all synthesized in-app (no audio files)
+- **Tap a sound to hear it** — the picker is a row of chips, so you audition sounds with one tap instead of opening a dropdown; per-task alarms preview as you pick them too
 - **The heads-up and the real alarm sound different**, so an early warning is never mistaken for a task actually being due
 - **Per-task alarms** — give an important task its own sound when you add or edit it; it shows as a ♪ pill on the row
 - **Repeat** a due alarm once, 3×, 5×, or until you hit Snooze or Done
