@@ -141,6 +141,28 @@ li.due-soon { border-left-color: var(--gold); }
 .pill.due-soon { color: var(--gold-ink); border-color: var(--gold); background: var(--gold-soft); }
 .pill.sound { color: var(--navy); border-color: var(--line); background: var(--bg); }
 
+/* ---- new version banner ---- */
+.update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.update-msg { flex: 1; min-width: 0; font-weight: 600; font-size: .9rem; }
+.update button {
+  min-height: 40px;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.update button:hover { background: var(--brand-d); border-color: var(--brand-d); }
+.update button:disabled { opacity: .7; cursor: default; }
+
 /* ---- alarm sound picker ---- */
 .sounds {
   background: var(--card);

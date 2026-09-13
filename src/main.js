@@ -6,6 +6,7 @@ import {
 import { renderList } from "./render.js";
 import { canNotify, requestPermission, sendNotification, toast } from "./notify.js";
 import { setSoundEnabled, unlockAudio, playChime, playSound, SOUNDS, SOUND_NAMES } from "./sound.js";
+import { APP_VERSION, isOutdated, fetchDeployedVersion, reloadToVersion } from "./update.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
@@ -22,6 +23,8 @@ const dueSoundEl = $("dueSound");
 const soonSoundEl = $("soonSound");
 const repeatEl = $("repeat");
 const taskSoundEl = $("taskSound");
+const updateEl = $("update");
+const updateBtn = $("updateBtn");
 
 const BASE_TITLE = document.title;
 const SNOOZE_MIN = 10;
@@ -315,3 +318,31 @@ if (canNotify() && Notification.permission === "granted") {
   notifyBtn.textContent = "Not supported here";
   notifyBtn.disabled = true;
 }
+
+/* ---------- new version available ---------- */
+
+// Installed to a Home Screen there is no reload button, so the app checks for a
+// newer build itself and offers it rather than making you reinstall.
+const UPDATE_POLL_MS = 15 * 60_000;
+let pendingVersion = null;
+
+async function checkForUpdate() {
+  const deployed = await fetchDeployedVersion();
+  if (!isOutdated(deployed)) return;
+  pendingVersion = deployed;
+  updateEl.hidden = false;
+}
+
+updateBtn.addEventListener("click", () => {
+  updateBtn.disabled = true;
+  updateBtn.textContent = "Updating…";
+  reloadToVersion(pendingVersion || String(Date.now()));
+});
+
+checkForUpdate();
+setInterval(checkForUpdate, UPDATE_POLL_MS);
+// Coming back to the app is the moment a new build is most likely waiting.
+window.addEventListener("focus", checkForUpdate);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+
+console.info(`Todo Reminder build ${APP_VERSION}`);
