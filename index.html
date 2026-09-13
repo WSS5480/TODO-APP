@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <title>Todo Reminder</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Todo Reminder</h1>
+      <div class="sub">Local-only. Keep this tab open and alarms ring at the due time.</div>
+    </header>
+    <form id="form">
+      <input id="task" type="text" placeholder="What needs doing?" required maxlength="200" />
+      <input id="when" type="datetime-local" title="Due date & time (optional)" />
+      <select id="prio" title="Priority">
+        <option value="low">Low</option>
+        <option value="med" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button type="submit">Add</button>
+    </form>
+    <div class="settings">
+      <button class="ghost toggle on" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
+      <label class="lead">Heads-up
+        <select id="lead" title="Also alert this long before a task is due">
+          <option value="0">off</option>
+          <option value="5">5 min before</option>
+          <option value="10" selected>10 min before</option>
+          <option value="15">15 min before</option>
+          <option value="30">30 min before</option>
+          <option value="60">1 hour before</option>
+        </select>
+      </label>
+      <button class="ghost" id="notifyBtn" type="button">Enable notifications</button>
+    </div>
+    <div class="toolbar">
+      <span id="count">0 active</span>
+      <button class="ghost" id="clearBtn" type="button">Clear done</button>
+    </div>
+    <ul id="list"></ul>
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
