@@ -27,6 +27,12 @@ body {
   display: flex;
   justify-content: center;
   padding: 24px 16px 64px;
+  /* Installed on a Home Screen the page runs full-bleed under the notch and the
+     home indicator, so keep the existing gutters and add the safe areas to them. */
+  padding-top: calc(24px + env(safe-area-inset-top));
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .app { width: 100%; max-width: 560px; }
 
@@ -43,9 +49,11 @@ body {
 h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
 .sub { color: rgba(255, 255, 255, .72); font-size: .85rem; }
 
-form {
+/* the add-task form; scoped by id so the inline edit form (also a <form>)
+   does not get a second card background nested inside its row */
+#form {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 8px;
   background: var(--card);
   border: 1px solid var(--line);
@@ -131,6 +139,7 @@ li.due-soon { border-left-color: var(--gold); }
 .pill.low  { color: var(--good); border-color: var(--good); background: var(--good-soft); }
 .pill.overdue { color: #fff; border-color: var(--bad); background: var(--bad); }
 .pill.due-soon { color: var(--gold-ink); border-color: var(--gold); background: var(--gold-soft); }
+.pill.sound { color: var(--navy); border-color: var(--line); background: var(--bg); }
 .del {
   background: none;
   border: none;
@@ -140,6 +149,71 @@ li.due-soon { border-left-color: var(--gold); }
   padding: 0 4px;
 }
 .del:hover { color: var(--brand-d); background: none; }
+.edit {
+  background: none;
+  border: none;
+  color: var(--mut);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 4px;
+}
+.edit:hover { color: var(--navy); background: none; }
+
+/* inline edit form (replaces the row's contents while editing) */
+li.editing { border-left-color: var(--navy); }
+.edit-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+  /* the row is a flex container: without this the form refuses to shrink below
+     its content width and spills out of the card on narrow screens */
+  flex: 1;
+  min-width: 0;
+}
+.edit-title { grid-column: 1 / -1; }
+.edit-form input,
+.edit-form select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  min-width: 0;
+}
+.edit-form input:focus,
+.edit-form select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.edit-form .save,
+.edit-form .cancel {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+}
+.edit-form .save {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.edit-form .save:hover { background: var(--brand-d); border-color: var(--brand-d); }
+.edit-form .cancel { background: var(--card); color: var(--mut); }
+.edit-form .cancel:hover { color: var(--ink); }
+
+@media (max-width: 560px) {
+  /* stack the fields and put Save / Cancel side by side on the last row */
+  .edit-form { grid-template-columns: 1fr 1fr; }
+  .edit-when, .edit-prio, .edit-sound { grid-column: 1 / -1; }
+  /* the add form's four controls do not fit one phone row */
+  #form { grid-template-columns: 1fr 1fr; }
+  #when, #form button[type="submit"] { grid-column: 1 / -1; }
+}
 .empty {
   text-align: center;
   color: var(--mut);

@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <title>Todo Reminder</title>
+
+  <!-- Home-screen install. iOS ignores the SVG favicon and the manifest icons,
+       so it needs its own PNG apple-touch-icon. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#16213f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Todo" />
+
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -21,6 +32,8 @@
         <option value="med" selected>Medium</option>
         <option value="high">High</option>
       </select>
+      <!-- options filled from the sound library in main.js -->
+      <select id="taskSound" title="Alarm for this task (optional)"></select>
       <button type="submit">Add</button>
     </form>
     <div class="settings">
@@ -33,6 +46,20 @@
           <option value="15">15 min before</option>
           <option value="30">30 min before</option>
           <option value="60">1 hour before</option>
+        </select>
+      </label>
+      <label class="lead">Alarm
+        <select id="dueSound" title="Sound when a task is due"></select>
+      </label>
+      <label class="lead">Heads-up sound
+        <select id="soonSound" title="Sound for the early warning"></select>
+      </label>
+      <label class="lead">Repeat
+        <select id="repeat" title="How many times a due alarm rings">
+          <option value="1" selected>once</option>
+          <option value="3">3 times</option>
+          <option value="5">5 times</option>
+          <option value="30">until dismissed</option>
         </select>
       </label>
       <button class="ghost" id="notifyBtn" type="button">Enable notifications</button>
