@@ -25,6 +25,12 @@ Live: https://todo-app-qpd5.onrender.com
 
 Alarms fire while the tab is open — there is no server, so nothing runs when the tab is closed. On a phone, keep it open in the foreground for alarms.
 
+## Updates
+
+Installed to a Home Screen there is no reload button, and iOS can hold on to a cached copy of the page indefinitely — which otherwise means deleting and reinstalling the app to pick up a new version.
+
+Every build stamps a version into the bundle and writes the same value to `version.json`. The running app checks that file on launch, whenever you switch back to it, and every 15 minutes. When the deployed build differs it shows **A new version is available**; tapping **Update now** reloads onto a URL the cache has never seen, so the stale page cannot be served again.
+
 ## Install on your phone
 
 The app ships a web manifest and icons, so it can be installed to a Home Screen and opens standalone, without browser chrome.
