@@ -40,7 +40,10 @@ function versionStamp() {
 }
 
 export default defineConfig({
-  base: "./",
+  // Served from the domain root. Absolute paths matter here: with "./" Vite
+  // rewrites every icon and manifest href to a relative one, and iOS failed to
+  // resolve the manifest's icons, falling back to a generated letter tile.
+  base: "/",
   plugins: [versionStamp()],
   define: {
     __APP_VERSION__: JSON.stringify(VERSION_TOKEN),
