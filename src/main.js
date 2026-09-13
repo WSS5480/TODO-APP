@@ -7,6 +7,7 @@ import { renderList } from "./render.js";
 import { canNotify, requestPermission, sendNotification, toast } from "./notify.js";
 import { setSoundEnabled, unlockAudio, playChime, playSound, SOUNDS, SOUND_NAMES } from "./sound.js";
 import { APP_VERSION, APP_BUILT_AT, isOutdated, fetchDeployedVersion, reloadToVersion } from "./update.js";
+import { buildCalendar, countExportable, icsFilename } from "./calendar.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
@@ -28,6 +29,7 @@ const updateBtn = $("updateBtn");
 const updateDismiss = $("updateDismiss");
 const settingsBtn = $("settingsBtn");
 const settingsPanel = $("settingsPanel");
+const exportBtn = $("exportBtn");
 
 const BASE_TITLE = document.title;
 const SNOOZE_MIN = 10;
@@ -48,6 +50,7 @@ function persist() {
   save(items);
   renderList(listEl, countEl, items, editingId);
   updateTitle();
+  syncExportBtn();
 }
 
 function focusEdit() {
@@ -230,6 +233,13 @@ listEl.addEventListener("click", (e) => {
     return;
   }
 
+  const cal = e.target.closest("[data-action='ics']");
+  if (cal) {
+    const item = items.find((it) => it.id === cal.dataset.id);
+    if (item) exportItems([item], icsFilename(item.title));
+    return;
+  }
+
   const ed = e.target.closest("[data-action='edit']");
   if (ed) {
     editingId = ed.dataset.id;
@@ -265,6 +275,41 @@ listEl.addEventListener("keydown", (e) => {
     persist();
   }
 });
+
+/* ---------- calendar export ---------- */
+
+// Hand the file to the browser. On a phone this opens the OS calendar, which
+// offers to add the event — and a calendar alert still fires when this app is
+// closed, which its own alarms cannot.
+function downloadIcs(filename, text) {
+  const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // revoke late: Safari reads the blob after the click returns
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+function exportItems(list, filename) {
+  if (!countExportable(list)) {
+    toast("Nothing to export — a task needs a due time to go in a calendar.");
+    return;
+  }
+  downloadIcs(filename, buildCalendar(list, { leadMinutes: prefs.lead }));
+}
+
+function syncExportBtn() {
+  const n = countExportable(items);
+  exportBtn.textContent = n ? `Export ${n} to calendar` : "Export to calendar";
+  exportBtn.disabled = n === 0;
+}
+
+exportBtn.addEventListener("click", () => exportItems(items, "to-do-reminder.ics"));
 
 clearBtn.addEventListener("click", () => {
   items = clearDone(items);
