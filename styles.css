@@ -27,6 +27,12 @@ body {
   display: flex;
   justify-content: center;
   padding: 24px 16px 64px;
+  /* Installed on a Home Screen the page runs full-bleed under the notch and the
+     home indicator, so keep the existing gutters and add the safe areas to them. */
+  padding-top: calc(24px + env(safe-area-inset-top));
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .app { width: 100%; max-width: 560px; }
 
@@ -158,6 +164,10 @@ li.editing { border-left-color: var(--navy); }
   gap: 8px;
   width: 100%;
   align-items: center;
+  /* the row is a flex container: without this the form refuses to shrink below
+     its content width and spills out of the card on narrow screens */
+  flex: 1;
+  min-width: 0;
 }
 .edit-title { grid-column: 1 / -1; }
 .edit-form input,
@@ -194,8 +204,9 @@ li.editing { border-left-color: var(--navy); }
 .edit-form .cancel:hover { color: var(--ink); }
 
 @media (max-width: 560px) {
+  /* stack the fields and put Save / Cancel side by side on the last row */
   .edit-form { grid-template-columns: 1fr 1fr; }
-  .edit-when, .edit-prio { grid-column: span 1; }
+  .edit-when, .edit-prio { grid-column: 1 / -1; }
 }
 .empty {
   text-align: center;

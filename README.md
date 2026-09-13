@@ -19,7 +19,20 @@ Live: https://todo-app-qpd5.onrender.com
 - Overdue tasks highlighted, due-soon tasks flagged
 - Saves to `localStorage` (survives refresh & close)
 
-Alarms fire while the tab is open — there is no server, so nothing runs when the tab is closed. On a phone, keep it open in the foreground (or add it to the home screen) for alarms.
+Alarms fire while the tab is open — there is no server, so nothing runs when the tab is closed. On a phone, keep it open in the foreground for alarms.
+
+## Install on your phone
+
+The app ships a web manifest and icons, so it can be installed to a Home Screen and opens standalone, without browser chrome.
+
+**iPhone / iPad (Safari):** open the site in **Safari** (not Chrome — only Safari can install to the Home Screen on iOS), tap the **Share** button, then **Add to Home Screen**.
+
+**Android (Chrome):** tap the **⋮** menu, then **Install app** / **Add to Home screen**.
+
+Two things to know on iOS:
+
+- **Alarms still only ring while the app is open and in the foreground.** Installing it does not buy background execution — iOS suspends timers as soon as you switch apps or lock the screen. Nothing here runs on a server, so a closed app rings nothing.
+- **The installed app has its own storage.** iOS gives a Home Screen app a separate storage area from Safari, so tasks you added in Safari will not appear in the installed copy. Start fresh there.
 
 ## Quick start
 ```bash
