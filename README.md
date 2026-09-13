@@ -2,6 +2,7 @@
 
 A simple, dependency-free todo app with due-time reminders. Built with vanilla JS + Vite, styled with the acasa color palette.
 
+![CI](https://github.com/WSS5480/TODO-APP/actions/workflows/test.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 Live: https://todo-app-qpd5.onrender.com
