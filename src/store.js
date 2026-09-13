@@ -65,6 +65,30 @@ export function completeItem(items, id) {
   return items.map((it) => (it.id === id ? { ...it, done: true } : it));
 }
 
+// Apply an edit to one task. Fields left undefined keep their current value.
+// Changing the due time re-arms both alarms, so a task moved to a later time
+// rings again even if it already fired at the old one.
+export function editItem(items, id, { title, due, prio } = {}) {
+  return items.map((it) => {
+    if (it.id !== id) return it;
+
+    const nextTitle = title === undefined ? it.title : String(title).trim();
+    if (!nextTitle) return it; // an edit must never blank out a task
+
+    const nextDue =
+      due === undefined ? it.due : due ? new Date(due).getTime() : null;
+    const rearm = nextDue !== it.due;
+
+    return {
+      ...it,
+      title: nextTitle,
+      due: nextDue,
+      prio: prio === undefined ? it.prio : prio || it.prio,
+      ...(rearm ? { alertedAt: null, preAlertedAt: null } : {}),
+    };
+  });
+}
+
 export function removeItem(items, id) {
   return items.filter((it) => it.id !== id);
 }
@@ -145,4 +169,12 @@ export function fmtIn(ms) {
   if (m < 60) return `in ${m} min`;
   const h = Math.round(m / 60);
   return `in ${h} h`;
+}
+
+// Timestamp -> the value an <input type="datetime-local"> expects, in local time.
+// toISOString() would shift by the UTC offset and show the wrong time in the editor.
+export function toLocalInput(ts) {
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

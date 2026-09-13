@@ -140,6 +140,63 @@ li.due-soon { border-left-color: var(--gold); }
   padding: 0 4px;
 }
 .del:hover { color: var(--brand-d); background: none; }
+.edit {
+  background: none;
+  border: none;
+  color: var(--mut);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 4px;
+}
+.edit:hover { color: var(--navy); background: none; }
+
+/* inline edit form (replaces the row's contents while editing) */
+li.editing { border-left-color: var(--navy); }
+.edit-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+.edit-title { grid-column: 1 / -1; }
+.edit-form input,
+.edit-form select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  min-width: 0;
+}
+.edit-form input:focus,
+.edit-form select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.edit-form .save,
+.edit-form .cancel {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+}
+.edit-form .save {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.edit-form .save:hover { background: var(--brand-d); border-color: var(--brand-d); }
+.edit-form .cancel { background: var(--card); color: var(--mut); }
+.edit-form .cancel:hover { color: var(--ink); }
+
+@media (max-width: 560px) {
+  .edit-form { grid-template-columns: 1fr 1fr; }
+  .edit-when, .edit-prio { grid-column: span 1; }
+}
 .empty {
   text-align: center;
   color: var(--mut);

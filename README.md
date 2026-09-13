@@ -9,6 +9,7 @@ Live: https://todo-app-qpd5.onrender.com
 
 ## Features
 - Add / complete / delete tasks
+- **Edit a task** in place — change its title, due time or priority (Escape or Cancel backs out)
 - Optional due date & time with priority (low / med / high)
 - **Alarm chime** when a task comes due (synthesized in-app, no audio files; toggle with the Sound button)
 - **Heads-up alert** a configurable 5–60 minutes before the due time
