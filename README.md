@@ -1,4 +1,4 @@
-# Todo Reminder
+# To Do Reminder
 
 A simple, dependency-free todo app with due-time reminders. Built with vanilla JS + Vite, styled with the acasa color palette.
 
