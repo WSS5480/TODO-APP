@@ -9,7 +9,11 @@
   <!-- Home-screen install. iOS ignores the SVG favicon and the manifest icons,
        so it needs its own PNG apple-touch-icon. -->
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152.png" />
+  <!-- older iOS only looks for the -precomposed name -->
+  <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png" />
   <meta name="theme-color" content="#16213f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
