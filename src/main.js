@@ -70,8 +70,44 @@ function fillSounds(select, { withDefault = false } = {}) {
   }
 }
 
-fillSounds(dueSoundEl);
-fillSounds(soonSoundEl);
+// A row of tappable chips: one tap both picks the sound and plays it, which is
+// far easier on a phone than opening a dropdown to audition each option.
+function buildPicker(host, getValue, onPick) {
+  host.innerHTML = "";
+  for (const name of SOUND_NAMES) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "sound-chip";
+    chip.dataset.sound = name;
+    chip.setAttribute("role", "radio");
+    chip.innerHTML = '<span class="play" aria-hidden="true">&#9654;</span>';
+    chip.append(SOUNDS[name].label);
+    chip.addEventListener("click", () => {
+      onPick(name);
+      unlockAudio([name]);
+      playChime(name); // always audition, even when re-tapping the current pick
+      syncPicker(host, getValue);
+    });
+    host.appendChild(chip);
+  }
+  syncPicker(host, getValue);
+}
+
+function syncPicker(host, getValue) {
+  const current = getValue();
+  for (const chip of host.querySelectorAll(".sound-chip")) {
+    const on = chip.dataset.sound === current;
+    chip.classList.toggle("on", on);
+    chip.setAttribute("aria-checked", String(on));
+  }
+}
+
+// Only the sounds actually reachable get primed, so the library can grow
+// without building every WAV on the first tap.
+function soundsInUse() {
+  return [...new Set([prefs.dueSound, prefs.soonSound, ...items.map((it) => it.sound)])].filter(Boolean);
+}
+
 fillSounds(taskSoundEl, { withDefault: true });
 
 function syncSettingsUI() {
@@ -79,21 +115,35 @@ function syncSettingsUI() {
   soundBtn.classList.toggle("on", prefs.sound);
   soundBtn.setAttribute("aria-pressed", String(prefs.sound));
   leadEl.value = String(prefs.lead);
-  dueSoundEl.value = prefs.dueSound;
-  soonSoundEl.value = prefs.soonSound;
+  syncPicker(dueSoundEl, () => prefs.dueSound);
+  syncPicker(soonSoundEl, () => prefs.soonSound);
   repeatEl.value = String(prefs.repeat);
   setSoundEnabled(prefs.sound);
 }
 
-// Changing a sound previews it, so you can hear what you picked.
-for (const [el, key] of [[dueSoundEl, "dueSound"], [soonSoundEl, "soonSound"]]) {
-  el.addEventListener("change", () => {
-    prefs = { ...prefs, [key]: el.value };
-    savePrefs(prefs);
-    unlockAudio();
+buildPicker(dueSoundEl, () => prefs.dueSound, (name) => {
+  prefs = { ...prefs, dueSound: name };
+  savePrefs(prefs);
+});
+buildPicker(soonSoundEl, () => prefs.soonSound, (name) => {
+  prefs = { ...prefs, soonSound: name };
+  savePrefs(prefs);
+});
+
+// Picking a per-task alarm previews it too, in both the add and the edit form.
+taskSoundEl.addEventListener("change", () => {
+  if (!taskSoundEl.value) return;
+  unlockAudio([taskSoundEl.value]);
+  playChime(taskSoundEl.value);
+});
+
+listEl.addEventListener("change", (e) => {
+  const el = e.target.closest(".edit-sound");
+  if (el && el.value) {
+    unlockAudio([el.value]);
     playChime(el.value);
-  });
-}
+  }
+});
 
 repeatEl.addEventListener("change", () => {
   prefs = { ...prefs, repeat: Number(repeatEl.value) || 1 };
@@ -105,7 +155,7 @@ soundBtn.addEventListener("click", () => {
   savePrefs(prefs);
   syncSettingsUI();
   if (prefs.sound) {
-    unlockAudio();
+    unlockAudio(soundsInUse());
     playChime(prefs.dueSound); // preview the alarm
   }
 });
@@ -117,7 +167,7 @@ leadEl.addEventListener("change", () => {
 
 // Browsers only allow audio after a user gesture; unlock on the first one.
 for (const ev of ["pointerdown", "keydown", "touchstart"]) {
-  document.addEventListener(ev, unlockAudio, { once: true, passive: true });
+  document.addEventListener(ev, () => unlockAudio(soundsInUse()), { once: true, passive: true });
 }
 
 /* ---------- task actions ---------- */

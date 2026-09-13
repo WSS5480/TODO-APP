@@ -37,6 +37,36 @@ export const SOUNDS = {
       [0.66, 1318.5, 0.35, 0.45],
     ],
   },
+  marimba: {
+    label: "Marimba",
+    dur: 1.3,
+    decay: 6.0,
+    tones: [[0, 523.25, 0.6, 0.5], [0.13, 659.25, 0.6, 0.5], [0.26, 783.99, 0.9, 0.5]],
+  },
+  digital: {
+    label: "Digital",
+    dur: 1.5,
+    decay: 16.0,
+    tones: [
+      [0, 1760.0, 0.12, 0.42], [0.14, 1760.0, 0.12, 0.42],
+      [0.5, 1760.0, 0.12, 0.42], [0.64, 1760.0, 0.12, 0.42],
+      [1.0, 1760.0, 0.12, 0.42], [1.14, 1760.0, 0.12, 0.42],
+    ],
+  },
+  klaxon: {
+    label: "Klaxon",
+    dur: 1.8,
+    decay: 1.2,
+    tones: [
+      [0, 329.63, 0.55, 0.55], [0.6, 392.0, 0.55, 0.55], [1.2, 329.63, 0.6, 0.55],
+    ],
+  },
+  soft: {
+    label: "Soft",
+    dur: 1.6,
+    decay: 2.2,
+    tones: [[0, 392.0, 1.5, 0.4], [0.25, 523.25, 1.2, 0.22]],
+  },
 };
 
 export const SOUND_NAMES = Object.keys(SOUNDS);
@@ -99,8 +129,8 @@ export function buildChimeWav() {
 }
 
 const elements = new Map();
+const unlockedNames = new Set();
 let enabled = true;
-let unlocked = false;
 let unlocking = null; // in-flight unlock, so a sound played in the same gesture can wait
 
 function getAudio(name) {
@@ -138,15 +168,17 @@ function unlockOne(a) {
 // element unlocked, since iOS grants playback per element, not per page.
 // Resolves once they are all unmuted and idle again, so a preview played in the
 // same gesture can wait rather than ring into a muted element.
-export function unlockAudio() {
-  if (unlocked) return Promise.resolve();
-  if (unlocking) return unlocking;
+export function unlockAudio(names = SOUND_NAMES) {
+  const todo = names.filter((name) => SOUNDS[name] && !unlockedNames.has(name));
+  if (!todo.length) return unlocking || Promise.resolve();
 
-  const all = Promise.all(SOUND_NAMES.map((name) => unlockOne(getAudio(name))));
+  const all = Promise.all(
+    todo.map((name) => unlockOne(getAudio(name)).then(() => unlockedNames.add(name))),
+  );
   // A play() promise that never settles must not leave every later alarm
   // waiting on it forever, which would silence the app for the whole session.
   const guard = new Promise((resolve) => setTimeout(resolve, UNLOCK_TIMEOUT_MS));
-  const finish = () => { unlocked = true; unlocking = null; };
+  const finish = () => { unlocking = null; };
 
   unlocking = Promise.race([all, guard]).then(finish, finish);
   return unlocking;

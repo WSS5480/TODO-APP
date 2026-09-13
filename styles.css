@@ -140,6 +140,61 @@ li.due-soon { border-left-color: var(--gold); }
 .pill.overdue { color: #fff; border-color: var(--bad); background: var(--bad); }
 .pill.due-soon { color: var(--gold-ink); border-color: var(--gold); background: var(--gold-soft); }
 .pill.sound { color: var(--navy); border-color: var(--line); background: var(--bg); }
+
+/* ---- alarm sound picker ---- */
+.sounds {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.sounds summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+  color: var(--navy);
+}
+.sound-group { margin: 10px 0 4px; }
+.sound-label {
+  display: block;
+  font-size: .78rem;
+  color: var(--mut);
+  margin-bottom: 6px;
+}
+.sound-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sound-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* 44px keeps the tap target comfortable on a phone */
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: .85rem;
+  cursor: pointer;
+}
+.sound-chip .play { color: var(--brand); font-size: .7rem; }
+.sound-chip.on {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-d);
+}
+.sound-chip.on .play { color: var(--brand-d); }
+.sound-hint {
+  margin: 10px 0 4px;
+  font-size: .76rem;
+  color: var(--mut);
+}
 .del {
   background: none;
   border: none;
