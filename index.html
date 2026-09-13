@@ -30,7 +30,11 @@
       <button id="updateDismiss" class="update-x" type="button" aria-label="Dismiss">&#10005;</button>
     </div>
     <header class="top">
-      <h1>Todo Reminder</h1>
+      <div class="top-row">
+        <h1>Todo Reminder</h1>
+        <button id="settingsBtn" class="gear" type="button"
+                aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">&#9881;</button>
+      </div>
       <div class="sub">Local-only. Keep this tab open and alarms ring at the due time.</div>
     </header>
     <form id="form">
@@ -45,7 +49,8 @@
       <select id="taskSound" title="Alarm for this task (optional)"></select>
       <button type="submit">Add</button>
     </form>
-    <div class="settings">
+    <section id="settingsPanel" class="settings-panel" hidden>
+      <div class="settings">
       <button class="ghost toggle on" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
       <label class="lead">Heads-up
         <select id="lead" title="Also alert this long before a task is due">
@@ -66,10 +71,8 @@
         </select>
       </label>
       <button class="ghost" id="notifyBtn" type="button">Enable notifications</button>
-    </div>
-    <!-- tap a sound to pick it and hear it; chips beat a dropdown on a phone -->
-    <details class="sounds" id="soundPanel">
-      <summary>Alarm sounds</summary>
+      </div>
+      <!-- tap a sound to pick it and hear it; chips beat a dropdown on a phone -->
       <div class="sound-group">
         <span class="sound-label">When a task is due</span>
         <div class="sound-picker" id="dueSound" role="radiogroup" aria-label="Alarm sound"></div>
@@ -79,7 +82,7 @@
         <div class="sound-picker" id="soonSound" role="radiogroup" aria-label="Heads-up sound"></div>
       </div>
       <p class="sound-hint">Tap any sound to hear it.</p>
-    </details>
+    </section>
     <div class="toolbar">
       <span id="count">0 active</span>
       <button class="ghost" id="clearBtn" type="button">Clear done</button>
