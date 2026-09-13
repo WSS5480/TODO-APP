@@ -50,6 +50,7 @@ export function buildChimeWav() {
 let audio = null;
 let enabled = true;
 let unlocked = false;
+let unlocking = null; // in-flight unlock, so a chime fired in the same gesture can wait
 
 function getAudio() {
   if (!audio) {
@@ -65,23 +66,58 @@ export function setSoundEnabled(on) {
 
 // Call from a user gesture (click/tap/keydown). Plays muted for an instant so the
 // browser's autoplay policy lets the same element play later from a timer.
+// Resolves once the element is unmuted and idle again: the same gesture often also
+// previews the chime, and that must not play into the element while it is muted.
 export function unlockAudio() {
-  if (unlocked) return;
+  if (unlocked) return Promise.resolve();
+  if (unlocking) return unlocking;
+
   const a = getAudio();
   a.muted = true;
-  const p = a.play();
-  const finish = () => { a.pause(); a.currentTime = 0; a.muted = false; unlocked = true; };
-  if (p && typeof p.then === "function") p.then(finish).catch(() => { a.muted = false; });
-  else finish();
+
+  const done = () => {
+    a.pause();
+    a.currentTime = 0;
+    a.muted = false;
+    unlocked = true;
+    unlocking = null;
+  };
+  const fail = () => {
+    a.muted = false;
+    unlocking = null;
+  };
+
+  let p;
+  try {
+    p = a.play();
+  } catch {
+    fail();
+    return Promise.resolve();
+  }
+  unlocking = Promise.resolve(p).then(done, fail);
+  return unlocking;
 }
 
 export function playChime() {
   if (!enabled) return false;
   const a = getAudio();
-  try {
-    a.currentTime = 0;
+
+  const start = () => {
+    a.muted = false; // an unlock may have left it muted
+    try { a.currentTime = 0; } catch { /* not seekable yet */ }
     const p = a.play();
     if (p && typeof p.catch === "function") p.catch(() => {});
+  };
+
+  // An unlock from this same gesture still has the element muted and will pause
+  // it when it settles; wait for that instead of ringing into it.
+  if (unlocking) {
+    unlocking.then(start, start);
+    return true;
+  }
+
+  try {
+    start();
   } catch {
     return false;
   }
