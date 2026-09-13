@@ -6,7 +6,7 @@ import {
 import { renderList } from "./render.js";
 import { canNotify, requestPermission, sendNotification, toast } from "./notify.js";
 import { setSoundEnabled, unlockAudio, playChime, playSound, SOUNDS, SOUND_NAMES } from "./sound.js";
-import { APP_VERSION, isOutdated, fetchDeployedVersion, reloadToVersion } from "./update.js";
+import { APP_VERSION, APP_BUILT_AT, isOutdated, fetchDeployedVersion, reloadToVersion } from "./update.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
@@ -25,6 +25,7 @@ const repeatEl = $("repeat");
 const taskSoundEl = $("taskSound");
 const updateEl = $("update");
 const updateBtn = $("updateBtn");
+const updateDismiss = $("updateDismiss");
 
 const BASE_TITLE = document.title;
 const SNOOZE_MIN = 10;
@@ -325,13 +326,20 @@ if (canNotify() && Notification.permission === "granted") {
 // newer build itself and offers it rather than making you reinstall.
 const UPDATE_POLL_MS = 15 * 60_000;
 let pendingVersion = null;
+let dismissed = false;
 
 async function checkForUpdate() {
+  if (dismissed) return;
   const deployed = await fetchDeployedVersion();
   if (!isOutdated(deployed)) return;
-  pendingVersion = deployed;
+  pendingVersion = deployed.version;
   updateEl.hidden = false;
 }
+
+updateDismiss.addEventListener("click", () => {
+  dismissed = true; // until the next launch, so a banner can never get stuck
+  updateEl.hidden = true;
+});
 
 updateBtn.addEventListener("click", () => {
   updateBtn.disabled = true;
@@ -345,4 +353,4 @@ setInterval(checkForUpdate, UPDATE_POLL_MS);
 window.addEventListener("focus", checkForUpdate);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
 
-console.info(`Todo Reminder build ${APP_VERSION}`);
+console.info(`Todo Reminder build ${APP_VERSION} (${new Date(APP_BUILT_AT).toISOString()})`);

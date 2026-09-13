@@ -162,6 +162,15 @@ li.due-soon { border-left-color: var(--gold); }
 }
 .update button:hover { background: var(--brand-d); border-color: var(--brand-d); }
 .update button:disabled { opacity: .7; cursor: default; }
+.update .update-x {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, .75);
+  font-size: 1rem;
+  padding: 0 4px;
+  min-height: 40px;
+}
+.update .update-x:hover { background: none; color: #fff; }
 
 /* ---- alarm sound picker ---- */
 .sounds {
