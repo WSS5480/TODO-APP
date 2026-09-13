@@ -49,9 +49,11 @@ body {
 h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
 .sub { color: rgba(255, 255, 255, .72); font-size: .85rem; }
 
-form {
+/* the add-task form; scoped by id so the inline edit form (also a <form>)
+   does not get a second card background nested inside its row */
+#form {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 8px;
   background: var(--card);
   border: 1px solid var(--line);
@@ -137,6 +139,7 @@ li.due-soon { border-left-color: var(--gold); }
 .pill.low  { color: var(--good); border-color: var(--good); background: var(--good-soft); }
 .pill.overdue { color: #fff; border-color: var(--bad); background: var(--bad); }
 .pill.due-soon { color: var(--gold-ink); border-color: var(--gold); background: var(--gold-soft); }
+.pill.sound { color: var(--navy); border-color: var(--line); background: var(--bg); }
 .del {
   background: none;
   border: none;
@@ -206,7 +209,10 @@ li.editing { border-left-color: var(--navy); }
 @media (max-width: 560px) {
   /* stack the fields and put Save / Cancel side by side on the last row */
   .edit-form { grid-template-columns: 1fr 1fr; }
-  .edit-when, .edit-prio { grid-column: 1 / -1; }
+  .edit-when, .edit-prio, .edit-sound { grid-column: 1 / -1; }
+  /* the add form's four controls do not fit one phone row */
+  #form { grid-template-columns: 1fr 1fr; }
+  #when, #form button[type="submit"] { grid-column: 1 / -1; }
 }
 .empty {
   text-align: center;

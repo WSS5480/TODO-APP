@@ -1,4 +1,5 @@
 import { sortItems, dueClass, fmtWhen, toLocalInput } from "./store.js";
+import { SOUNDS, SOUND_NAMES } from "./sound.js";
 
 const PRIOS = [
   ["low", "Low"],
@@ -43,6 +44,23 @@ function editRow(it) {
     prio.appendChild(opt);
   }
 
+  const sound = document.createElement("select");
+  sound.className = "edit-sound";
+  sound.name = "sound";
+  sound.setAttribute("aria-label", "Alarm sound");
+  const dflt = document.createElement("option");
+  dflt.value = "";
+  dflt.textContent = "Default alarm";
+  dflt.selected = !it.sound;
+  sound.appendChild(dflt);
+  for (const name of SOUND_NAMES) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = SOUNDS[name].label;
+    opt.selected = it.sound === name;
+    sound.appendChild(opt);
+  }
+
   const save = document.createElement("button");
   save.type = "submit";
   save.className = "save";
@@ -54,7 +72,7 @@ function editRow(it) {
   cancel.textContent = "Cancel";
   cancel.dataset.action = "cancel-edit";
 
-  form.append(title, when, prio, save, cancel);
+  form.append(title, when, prio, sound, save, cancel);
   li.appendChild(form);
   return li;
 }
@@ -91,6 +109,13 @@ function taskRow(it) {
     const diff = it.due - Date.now();
     w.textContent = (diff < 0 ? "Overdue · " : "") + fmtWhen(it.due);
     meta.appendChild(w);
+  }
+
+  if (it.sound && SOUNDS[it.sound]) {
+    const s = document.createElement("span");
+    s.className = "pill sound";
+    s.textContent = "♪ " + SOUNDS[it.sound].label;
+    meta.appendChild(s);
   }
 
   body.appendChild(title);

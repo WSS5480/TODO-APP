@@ -1,8 +1,16 @@
 export const STORAGE_KEY = "todo-reminder.items.v1";
 export const PREFS_KEY = "todo-reminder.prefs.v1";
 
-// sound: play a chime when a task comes due; lead: minutes of heads-up before due (0 = off)
-export const DEFAULT_PREFS = { sound: true, lead: 10 };
+// sound: master on/off; lead: minutes of heads-up before due (0 = off)
+// dueSound / soonSound: which alarm to play for each kind, so a heads-up is
+// distinguishable from the real thing; repeat: how many times a due alarm rings.
+export const DEFAULT_PREFS = {
+  sound: true,
+  lead: 10,
+  dueSound: "chime",
+  soonSound: "ping",
+  repeat: 1,
+};
 
 export function load(storage = globalThis.localStorage) {
   try {
@@ -33,7 +41,7 @@ export function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export function addItem(items, { title, due, prio }) {
+export function addItem(items, { title, due, prio, sound }) {
   const t = title.trim();
   if (!t) return items;
   return [
@@ -43,6 +51,7 @@ export function addItem(items, { title, due, prio }) {
       title: t,
       due: due ? new Date(due).getTime() : null,
       prio: prio || "med",
+      sound: sound || null, // null = use the default alarm from prefs
       done: false,
       createdAt: Date.now(),
       alertedAt: null,     // when the "due now" alarm fired
@@ -68,7 +77,7 @@ export function completeItem(items, id) {
 // Apply an edit to one task. Fields left undefined keep their current value.
 // Changing the due time re-arms both alarms, so a task moved to a later time
 // rings again even if it already fired at the old one.
-export function editItem(items, id, { title, due, prio } = {}) {
+export function editItem(items, id, { title, due, prio, sound } = {}) {
   return items.map((it) => {
     if (it.id !== id) return it;
 
@@ -84,6 +93,7 @@ export function editItem(items, id, { title, due, prio } = {}) {
       title: nextTitle,
       due: nextDue,
       prio: prio === undefined ? it.prio : prio || it.prio,
+      sound: sound === undefined ? (it.sound ?? null) : sound || null,
       ...(rearm ? { alertedAt: null, preAlertedAt: null } : {}),
     };
   });
@@ -177,4 +187,12 @@ export function toLocalInput(ts) {
   const d = new Date(ts);
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Which sound an alert should use: a task's own choice wins for its due alarm,
+// otherwise the configured default. The heads-up always uses the heads-up
+// sound, so an early warning never sounds like the task is actually due.
+export function alertSound(item, kind, prefs) {
+  if (kind === "soon") return prefs.soonSound;
+  return item.sound || prefs.dueSound;
 }

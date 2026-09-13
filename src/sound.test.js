@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { buildChimeWav } from "./sound.js";
+import { buildChimeWav, buildWav, SOUNDS, SOUND_NAMES } from "./sound.js";
 
 describe("buildChimeWav", () => {
   it("produces a valid 16-bit mono PCM WAV data URL", () => {
@@ -27,18 +27,19 @@ describe("buildChimeWav", () => {
 // moment play() was called, and lets the test decide when play() settles.
 function fakeAudio() {
   const plays = [];
-  let settlePlay;
+  const pending = [];
   const el = {
     muted: false,
     currentTime: 0,
     preload: "",
     play: vi.fn(() => {
       plays.push({ muted: el.muted });
-      return new Promise((resolve) => { settlePlay = resolve; });
+      return new Promise((resolve) => { pending.push(resolve); });
     }),
     pause: vi.fn(),
   };
-  return { el, plays, settle: () => settlePlay && settlePlay() };
+  // unlockAudio() primes one element per sound, so settle every pending play
+  return { el, plays, settle: () => { pending.splice(0).forEach((r) => r()); } };
 }
 
 // sound.js holds module-level state (the element, the unlocked flag), so every
@@ -114,5 +115,102 @@ describe("unlockAudio + playChime", () => {
     sound.unlockAudio();
     await flush();
     expect(el.play.mock.calls.length).toBe(callsAfterFirst);
+  });
+});
+
+describe("sound library", () => {
+  it("builds a distinct, non-silent WAV for every sound", () => {
+    const seen = new Set();
+    for (const name of SOUND_NAMES) {
+      const url = buildWav(SOUNDS[name]);
+      expect(url.startsWith("data:audio/wav;base64,")).toBe(true);
+      const bytes = Uint8Array.from(atob(url.split(",")[1]), (c) => c.charCodeAt(0));
+      const view = new DataView(bytes.buffer);
+      let peak = 0;
+      for (let i = 44; i < bytes.length; i += 2) peak = Math.max(peak, Math.abs(view.getInt16(i, true)));
+      expect(peak, `${name} is silent`).toBeGreaterThan(8000);
+      expect(seen.has(url), `${name} duplicates another sound`).toBe(false);
+      seen.add(url);
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+});
+
+describe("playSound", () => {
+  it("repeats the alarm the requested number of times", async () => {
+    vi.useFakeTimers();
+    const { el, plays, settle } = fakeAudio();
+    const sound = await freshSound(el);
+    sound.unlockAudio();
+    settle();
+    await vi.advanceTimersByTimeAsync(2000);
+    plays.length = 0;
+
+    sound.playSound("chime", { repeat: 3 });
+    expect(plays).toHaveLength(1);          // first ring is immediate
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(plays).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(plays).toHaveLength(3);          // and then it stops
+    vi.useRealTimers();
+  });
+
+  it("stop() silences a repeating alarm", async () => {
+    vi.useFakeTimers();
+    const { el, plays, settle } = fakeAudio();
+    const sound = await freshSound(el);
+    sound.unlockAudio();
+    settle();
+    await vi.advanceTimersByTimeAsync(2000);
+    plays.length = 0;
+
+    const alarm = sound.playSound("chime", { repeat: 10 });
+    alarm.stop();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(plays).toHaveLength(1);          // only the ring already started
+    expect(el.pause).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("never rings more than MAX_REPEAT times", async () => {
+    vi.useFakeTimers();
+    const { el, plays, settle } = fakeAudio();
+    const sound = await freshSound(el);
+    sound.unlockAudio();
+    settle();
+    await vi.advanceTimersByTimeAsync(2000);
+    plays.length = 0;
+
+    sound.playSound("chime", { repeat: 1000 });
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(plays).toHaveLength(sound.MAX_REPEAT);
+    vi.useRealTimers();
+  });
+
+  it("falls back to the default sound for an unknown name", async () => {
+    const { el, plays, settle } = fakeAudio();
+    const sound = await freshSound(el);
+    sound.unlockAudio();
+    settle();
+    await flush();
+    plays.length = 0;
+
+    sound.playSound("no-such-sound");
+    expect(plays).toHaveLength(1);
+  });
+
+  it("rings anyway if the unlock never settles", async () => {
+    vi.useFakeTimers();
+    const { el, plays } = fakeAudio();
+    const sound = await freshSound(el);
+
+    sound.unlockAudio();   // never settled: play() stays pending
+    plays.length = 0;
+    sound.playSound("chime");
+    expect(plays).toHaveLength(0);                  // deferred at first
+
+    await vi.advanceTimersByTimeAsync(sound.UNLOCK_TIMEOUT_MS + 50);
+    expect(plays).toHaveLength(1);                  // the guard lets it through
+    vi.useRealTimers();
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   STORAGE_KEY, PREFS_KEY, DEFAULT_PREFS, load, save, loadPrefs, savePrefs,
   addItem, toggleItem, completeItem, removeItem, clearDone, snoozeItem,
-  dueAlerts, markAlerted, sortItems, dueClass, fmtWhen, fmtIn, editItem, toLocalInput,
+  dueAlerts, markAlerted, sortItems, dueClass, fmtWhen, fmtIn, editItem, toLocalInput, alertSound,
 } from "./store.js";
 
 function memStorage() {
@@ -204,7 +204,7 @@ describe("store: alarms", () => {
     const s = memStorage();
     expect(loadPrefs(s)).toEqual(DEFAULT_PREFS);
     savePrefs({ sound: false }, s);
-    expect(loadPrefs(s)).toEqual({ sound: false, lead: DEFAULT_PREFS.lead });
+    expect(loadPrefs(s)).toEqual({ ...DEFAULT_PREFS, sound: false });
     s.setItem(PREFS_KEY, "{nope");
     expect(loadPrefs(s)).toEqual(DEFAULT_PREFS);
   });
@@ -271,5 +271,46 @@ describe("toLocalInput", () => {
   it("round-trips through the datetime-local parser", () => {
     const d = new Date(2026, 10, 3, 18, 45);
     expect(new Date(toLocalInput(d.getTime())).getTime()).toBe(d.getTime());
+  });
+});
+
+describe("alertSound", () => {
+  const prefs = { dueSound: "chime", soonSound: "ping" };
+
+  it("uses the configured due sound when the task has no preference", () => {
+    expect(alertSound({ sound: null }, "due", prefs)).toBe("chime");
+  });
+
+  it("lets a task override the due sound", () => {
+    expect(alertSound({ sound: "urgent" }, "due", prefs)).toBe("urgent");
+  });
+
+  it("always uses the heads-up sound for an early warning", () => {
+    // a heads-up must not sound like the task is actually due
+    expect(alertSound({ sound: null }, "soon", prefs)).toBe("ping");
+    expect(alertSound({ sound: "urgent" }, "soon", prefs)).toBe("ping");
+  });
+});
+
+describe("per-task sound", () => {
+  it("defaults to null and round-trips through addItem", () => {
+    const [plain] = addItem([], { title: "a", prio: "med" });
+    expect(plain.sound).toBeNull();
+    const [custom] = addItem([], { title: "b", prio: "med", sound: "bell" });
+    expect(custom.sound).toBe("bell");
+  });
+
+  it("can be set and cleared by editItem", () => {
+    const items = addItem([], { title: "a", prio: "med" });
+    const set = editItem(items, items[0].id, { sound: "urgent" });
+    expect(set[0].sound).toBe("urgent");
+    const cleared = editItem(set, items[0].id, { sound: null });
+    expect(cleared[0].sound).toBeNull();
+  });
+
+  it("is left alone by an edit that does not mention it", () => {
+    const items = addItem([], { title: "a", prio: "med", sound: "bell" });
+    const renamed = editItem(items, items[0].id, { title: "b" });
+    expect(renamed[0].sound).toBe("bell");
   });
 });
