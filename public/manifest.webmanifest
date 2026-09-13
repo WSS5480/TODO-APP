@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Todo Reminder",
-  "short_name": "Todo",
-  "description": "Todo list with due-time alarms and heads-up reminders.",
+  "name": "To Do Reminder",
+  "short_name": "To Do",
+  "description": "To Do list with due-time alarms and heads-up reminders.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

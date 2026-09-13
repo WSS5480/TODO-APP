@@ -301,7 +301,7 @@ function fire({ item, kind }) {
     alarm.stop();
     if (activeAlarm === alarm) activeAlarm = null;
   };
-  sendNotification("Todo Reminder", label, `${item.id}:${kind}`, { sticky: isDue });
+  sendNotification("To Do Reminder", label, `${item.id}:${kind}`, { sticky: isDue });
   toast((isDue ? "⏰ " : "⏳ ") + label, {
     actions: [
       {
@@ -374,4 +374,4 @@ setInterval(checkForUpdate, UPDATE_POLL_MS);
 window.addEventListener("focus", checkForUpdate);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
 
-console.info(`Todo Reminder build ${APP_VERSION} (${new Date(APP_BUILT_AT).toISOString()})`);
+console.info(`To Do Reminder build ${APP_VERSION} (${new Date(APP_BUILT_AT).toISOString()})`);
