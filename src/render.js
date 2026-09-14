@@ -121,6 +121,22 @@ function taskRow(it) {
   body.appendChild(title);
   body.appendChild(meta);
 
+  li.appendChild(cb);
+  li.appendChild(body);
+
+  // only a task with a due time has anything to put in a calendar
+  if (it.due) {
+    const cal = document.createElement("button");
+    cal.className = "cal";
+    cal.type = "button";
+    cal.title = "Add to calendar";
+    cal.setAttribute("aria-label", `Add ${it.title} to calendar`);
+    cal.textContent = "\u{1F4C5}";
+    cal.dataset.id = it.id;
+    cal.dataset.action = "ics";
+    li.appendChild(cal);
+  }
+
   const edit = document.createElement("button");
   edit.className = "edit";
   edit.type = "button";
@@ -139,8 +155,6 @@ function taskRow(it) {
   del.dataset.id = it.id;
   del.dataset.action = "remove";
 
-  li.appendChild(cb);
-  li.appendChild(body);
   li.appendChild(edit);
   li.appendChild(del);
   return li;

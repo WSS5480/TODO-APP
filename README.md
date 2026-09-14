@@ -25,6 +25,17 @@ Live: https://todo-app-qpd5.onrender.com
 
 Alarms fire while the tab is open — there is no server, so nothing runs when the tab is closed. On a phone, keep it open in the foreground for alarms.
 
+## Calendar export
+
+A web page cannot read or write the phone's calendar — iOS only exposes that to native apps — but it can hand over a standard `.ics` file, which Calendar offers to import.
+
+- **📅 on any task with a due time** exports that one task
+- **Export to calendar** in the settings panel exports every task that has a due time
+
+Each event carries an alarm at the due time, plus a second one matching your heads-up setting. This is the one way to get a reminder that fires **while the app is closed**: iOS suspends the app's own timers as soon as you leave it, but a calendar alert still goes off.
+
+Export is one-way. Editing or deleting a task afterwards does not change an event already in your calendar. Events do keep a stable id per task, so re-exporting the same task updates it in place rather than adding a duplicate, in calendars that honour that.
+
 ## Updates
 
 Installed to a Home Screen there is no reload button, and iOS can hold on to a cached copy of the page indefinitely — which otherwise means deleting and reinstalling the app to pick up a new version.
