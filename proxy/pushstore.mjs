@@ -11,9 +11,14 @@ export const MAX_ALARMS_PER_DEVICE = 300;
 // the person has no idea why their phone is buzzing.
 export const LATE_GRACE_MS = 10 * 60_000;
 
-// A ceiling per run, so a backlog cannot spend the day's whole request budget
-// in one minute. Anything left over goes out on the next tick.
-export const MAX_SENDS_PER_RUN = 50;
+// A ceiling per run. The binding constraint is not the request budget but CPU:
+// a Worker on the free plan gets 10 ms of it per invocation, and each message
+// costs a key agreement, three key derivations and an AES-GCM seal. Waiting on
+// the network does not count, so the real limit is how much crypto fits.
+//
+// Ten is comfortably inside that with the VAPID signature computed once per
+// run, and anything left over simply goes out on the next tick a minute later.
+export const MAX_SENDS_PER_RUN = 10;
 
 export async function saveSubscription(db, { endpoint, p256dh, auth, label }, now = Date.now()) {
   await db

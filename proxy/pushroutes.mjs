@@ -7,7 +7,7 @@
 // the app where it is tested, and the server stays a timer that can be wiped
 // and rebuilt from the next upload.
 
-import { importVapidKeys, sendPush } from "./push.mjs";
+import { audienceOf, importVapidKeys, sendPush, vapidHeader } from "./push.mjs";
 import {
   saveSubscription,
   getSubscription,
@@ -187,17 +187,38 @@ export async function runScheduler(env, { now = Date.now(), log = console.log } 
   const keys = await keysFrom(env);
   const subject = subjectFrom(env);
 
-  const delivered = [];
+  // One VAPID signature per push service rather than per message. Signing is
+  // ECDSA, which costs CPU, and a Worker on the free plan has 10 ms of it per
+  // run — with every alarm usually going to the same phone, this is most of
+  // the budget saved for free.
+  const headers = new Map();
+  async function authorizationFor(endpoint) {
+    const audience = audienceOf(endpoint);
+    if (!headers.has(audience)) {
+      headers.set(audience, await vapidHeader(endpoint, keys, { subject, now }));
+    }
+    return headers.get(audience);
+  }
+
   const dead = new Set();
+  let sent = 0;
   let failed = 0;
 
   for (const row of rows) {
     if (dead.has(row.endpoint)) continue; // that device is gone; skip its others
     const payload = JSON.stringify(notificationFor(row));
-    const res = await sendPush(row, payload, keys, { subject, now });
+    const res = await sendPush(row, payload, keys, {
+      subject,
+      now,
+      authorization: await authorizationFor(row.endpoint),
+    });
 
     if (res.ok) {
-      delivered.push(row);
+      // Marked one at a time rather than in a batch at the end: if this run is
+      // cut short for running out of CPU, what already went out stays sent.
+      // Batching would lose that and ring the same alarms again next minute.
+      await markSent(env.DB, [row], now);
+      sent += 1;
     } else if (res.gone) {
       dead.add(row.endpoint);
     } else {
@@ -208,10 +229,9 @@ export async function runScheduler(env, { now = Date.now(), log = console.log } 
     }
   }
 
-  await markSent(env.DB, delivered, now);
   for (const endpoint of dead) await deleteSubscription(env.DB, endpoint);
 
-  const summary = { sent: delivered.length, failed, dropped: dead.size, expired };
+  const summary = { sent, failed, dropped: dead.size, expired };
   log(`push scheduler: ${JSON.stringify(summary)}`);
   return summary;
 }

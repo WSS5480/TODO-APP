@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { isPushEndpoint, handlePushRequest, runScheduler } from "./pushroutes.mjs";
 import { generateVapidKeys } from "./push.mjs";
-import { saveSubscription, getSubscription, replaceAlarms, dueAlarms } from "./pushstore.mjs";
+import { saveSubscription, getSubscription, replaceAlarms, dueAlarms, MAX_SENDS_PER_RUN } from "./pushstore.mjs";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 const SCHEMA_PATH = ["proxy/schema.sql", "schema.sql"]
@@ -310,5 +310,96 @@ describe("the scheduler", () => {
     const summary = await runScheduler(env, { now: min(1), log: (l) => lines.push(l) });
     expect(summary).toMatchObject({ sent: 0, expired: 0 });
     expect(lines).toEqual([]);
+  });
+});
+
+describe("the scheduler, on a Worker's CPU budget", () => {
+  const now = Date.UTC(2026, 9, 1, 12, 0, 0);
+  const min = (n) => now + n * 60_000;
+
+  beforeEach(async () => {
+    const b64 = (b) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    for (const endpoint of [ENDPOINT, "https://fcm.googleapis.com/fcm/send/second"]) {
+      const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+      const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+      await saveSubscription(env.DB, {
+        endpoint,
+        p256dh: b64(raw),
+        auth: b64(crypto.getRandomValues(new Uint8Array(16))),
+      }, now);
+    }
+  });
+
+  it("signs one VAPID token per push service, not one per message", async () => {
+    await replaceAlarms(env.DB, ENDPOINT, [
+      { id: "a", title: "One", at: min(1) },
+      { id: "b", title: "Two", at: min(2) },
+      { id: "c", title: "Three", at: min(3) },
+    ], now);
+
+    const seen = [];
+    globalThis.fetch = vi.fn(async (url, init) => {
+      seen.push({ url: String(url), auth: init.headers.Authorization });
+      return { ok: true, status: 201, text: async () => "" };
+    });
+
+    await runScheduler(env, { now: min(5), log: () => {} });
+    expect(seen).toHaveLength(3);
+    expect(new Set(seen.map((s) => s.auth)).size).toBe(1);
+  });
+
+  it("signs separately for a second push service", async () => {
+    await replaceAlarms(env.DB, ENDPOINT, [{ id: "a", title: "Apple", at: min(1) }], now);
+    await replaceAlarms(env.DB, "https://fcm.googleapis.com/fcm/send/second", [
+      { id: "b", title: "Google", at: min(2) },
+    ], now);
+
+    const auths = [];
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      auths.push(init.headers.Authorization);
+      return { ok: true, status: 201, text: async () => "" };
+    });
+
+    await runScheduler(env, { now: min(5), log: () => {} });
+    expect(auths).toHaveLength(2);
+    expect(new Set(auths).size).toBe(2); // a different audience needs its own token
+  });
+
+  it("keeps what it already delivered when a run is cut short", async () => {
+    await replaceAlarms(env.DB, ENDPOINT, [
+      { id: "a", title: "Got out", at: min(1) },
+      { id: "b", title: "Run died here", at: min(2) },
+    ], now);
+
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 201, text: async () => "" }));
+
+    // Stand in for the Worker being killed for running out of CPU: the second
+    // attempt to record a delivery never completes.
+    const realBatch = env.DB.batch.bind(env.DB);
+    let writes = 0;
+    env.DB.batch = async (statements) => {
+      writes += 1;
+      if (writes === 2) throw new Error("Worker exceeded CPU limit");
+      return realBatch(statements);
+    };
+
+    await expect(runScheduler(env, { now: min(5), log: () => {} })).rejects.toThrow(/CPU/);
+
+    env.DB.batch = realBatch;
+    // The first one is not owed again — only the one that was in flight.
+    const owed = await dueAlarms(env.DB, min(5));
+    expect(owed.map((r) => r.id)).toEqual(["b"]);
+  });
+
+  it("leaves a backlog for the next tick rather than trying to clear it at once", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ id: `t${i}`, title: `Task ${i}`, at: min(1) }));
+    await replaceAlarms(env.DB, ENDPOINT, many, now);
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 201, text: async () => "" }));
+
+    const first = await runScheduler(env, { now: min(5), log: () => {} });
+    expect(first.sent).toBe(MAX_SENDS_PER_RUN);
+
+    const second = await runScheduler(env, { now: min(6), log: () => {} });
+    expect(second.sent).toBe(MAX_SENDS_PER_RUN);
   });
 });

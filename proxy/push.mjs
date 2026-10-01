@@ -194,12 +194,14 @@ export async function encryptPayload(
 // `gone` is the one that matters operationally: 404 or 410 means the
 // subscription is dead — the app was deleted, or notifications were turned off
 // — and the row should be dropped rather than retried forever.
-export async function sendPush(subscription, payload, keys, { subject, ttl = 3600, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
+export async function sendPush(subscription, payload, keys, { subject, ttl = 3600, now = Date.now(), fetchImpl = globalThis.fetch, authorization: reuse = "" } = {}) {
   const { endpoint, p256dh, auth } = subscription;
 
   try {
     const body = await encryptPayload(payload, { userPublicKey: p256dh, authSecret: auth });
-    const authorization = await vapidHeader(endpoint, keys, { subject, now });
+    // The JWT is per push service, not per message, and signing it costs real
+    // CPU — which a Worker is rationed on. The caller may hand one back.
+    const authorization = reuse || (await vapidHeader(endpoint, keys, { subject, now }));
 
     const res = await fetchImpl(endpoint, {
       method: "POST",

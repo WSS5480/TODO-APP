@@ -90,6 +90,22 @@ An alarm more than ten minutes late is retired instead of sent. A reminder that
 goes off hours after the fact is worse than none — it rings about something
 already passed, when nobody knows why their phone is buzzing.
 
+### Living inside 10 ms
+
+A Worker on the free plan gets 10 milliseconds of CPU per invocation. Waiting
+on the network does not count, so what has to fit is the cryptography: per
+message, a key agreement, three key derivations and an AES-GCM seal.
+
+Two things keep a run inside that. The VAPID signature is computed once per
+push service rather than once per message, which is most of the saving when
+every alarm goes to the same phone. And a run sends at most ten, leaving any
+backlog for the next tick a minute later.
+
+Each delivery is recorded the moment it succeeds rather than in one batch at
+the end, so a run that is cut short keeps what already went out. Batched, a
+kill would lose the record of messages the phone had already received, and
+they would all ring again a minute later.
+
 ### Setting it up
 
 Once, from this folder:
