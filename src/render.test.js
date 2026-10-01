@@ -98,3 +98,49 @@ describe("renderList", () => {
     expect(listEl.querySelectorAll("[data-action='edit']")).toHaveLength(1);
   });
 });
+
+describe("renderList: repeats and synced tasks", () => {
+  const item = (over = {}) => ({
+    id: "1",
+    title: "Water the plants",
+    done: false,
+    prio: "med",
+    due: Date.now() + 3_600_000,
+    ...over,
+  });
+
+  it("shows a pill for a repeating task, with the full rule on hover", () => {
+    renderList(listEl, countEl, [item({ repeat: { freq: "weekdays", interval: 1 } })]);
+    const pill = listEl.querySelector(".pill.repeat");
+    expect(pill.textContent).toBe("↻ Weekdays");
+    expect(pill.title).toBe("Every weekday");
+  });
+
+  it("says how a counted series ends on hover", () => {
+    renderList(listEl, countEl, [item({ repeat: { freq: "daily", count: 3 } })]);
+    expect(listEl.querySelector(".pill.repeat").title).toBe("Every day, 3 more times");
+  });
+
+  it("shows no pill for a one-off task or a broken rule", () => {
+    renderList(listEl, countEl, [item({ repeat: null }), item({ id: "2", repeat: { freq: "hourly" } })]);
+    expect(listEl.querySelectorAll(".pill.repeat")).toHaveLength(0);
+  });
+
+  it("marks a task that came from the calendar", () => {
+    renderList(listEl, countEl, [item({ extId: "ev-1" }), item({ id: "2" })]);
+    expect(listEl.querySelectorAll(".pill.synced")).toHaveLength(1);
+  });
+
+  it("offers the repeat choices in the edit form, with the task's own selected", () => {
+    renderList(listEl, countEl, [item({ repeat: { freq: "monthly", interval: 1 } })], "1");
+    const select = listEl.querySelector(".edit-repeat");
+    expect(select.name).toBe("repeat");
+    expect(select.value).toBe("monthly");
+    expect(select.querySelectorAll("option").length).toBeGreaterThan(4);
+  });
+
+  it("selects 'does not repeat' for a one-off task", () => {
+    renderList(listEl, countEl, [item({ repeat: null })], "1");
+    expect(listEl.querySelector(".edit-repeat").value).toBe("");
+  });
+});

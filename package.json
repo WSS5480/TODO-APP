@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "comment:start": "Runs the calendar proxy that lives in proxy/. Defined here as well as in proxy/package.json so the service starts whether its root directory is the repo or proxy/.",
+    "start": "node proxy/server.mjs",
+    "start:proxy": "node proxy/server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage"

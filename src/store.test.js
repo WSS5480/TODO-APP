@@ -3,6 +3,7 @@ import {
   STORAGE_KEY, PREFS_KEY, DEFAULT_PREFS, load, save, loadPrefs, savePrefs,
   addItem, toggleItem, completeItem, removeItem, clearDone, snoozeItem,
   dueAlerts, markAlerted, sortItems, dueClass, fmtWhen, fmtIn, editItem, toLocalInput, alertSound,
+  mergeImported,
 } from "./store.js";
 
 function memStorage() {
@@ -312,5 +313,168 @@ describe("per-task sound", () => {
     const items = addItem([], { title: "a", prio: "med", sound: "bell" });
     const renamed = editItem(items, items[0].id, { title: "b" });
     expect(renamed[0].sound).toBe("bell");
+  });
+});
+
+/* ---------- repeating tasks ---------- */
+
+const at = (y, m, d, hh = 9, mm = 0) => new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
+const parts = (ts) => {
+  const d = new Date(ts);
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()];
+};
+
+describe("store: repeats", () => {
+  const addRepeating = (repeat, due = at(2026, 3, 10)) =>
+    addItem([], { title: "Water the plants", due: new Date(due), repeat });
+
+  it("keeps a normalized rule on the new task", () => {
+    const [it] = addRepeating("daily");
+    expect(it.repeat).toEqual({ freq: "daily", interval: 1, until: null, count: null });
+  });
+
+  it("refuses a repeat with no date to repeat from", () => {
+    const [it] = addItem([], { title: "Someday", due: "", repeat: "daily" });
+    expect(it.repeat).toBeNull();
+  });
+
+  it("moves a ticked-off repeating task to its next occurrence instead of closing it", () => {
+    const items = addRepeating("daily");
+    const [next] = toggleItem(items, items[0].id, at(2026, 3, 10, 9, 5));
+    expect(next.done).toBe(false);
+    expect(parts(next.due)).toEqual([2026, 3, 11, 9, 0]);
+    expect(next.doneCount).toBe(1);
+    expect(next.lastDoneAt).toBe(at(2026, 3, 10, 9, 5));
+  });
+
+  it("re-arms the alarms for the next occurrence", () => {
+    let items = addRepeating("daily");
+    items = markAlerted(items, items[0].id, "due");
+    expect(items[0].alertedAt).not.toBeNull();
+    const [next] = completeItem(items, items[0].id, at(2026, 3, 10, 9, 5));
+    expect(next.alertedAt).toBeNull();
+    expect(next.preAlertedAt).toBeNull();
+  });
+
+  it("closes the task once the series runs out", () => {
+    const items = addRepeating({ freq: "daily", count: 1 });
+    const [next] = completeItem(items, items[0].id, at(2026, 3, 10, 9, 5));
+    expect(next.done).toBe(true);
+    expect(parts(next.due)).toEqual([2026, 3, 10, 9, 0]); // left where it was
+  });
+
+  it("closes a one-off task as before", () => {
+    const items = addItem([], { title: "Buy milk", due: new Date(at(2026, 3, 10)) });
+    expect(completeItem(items, items[0].id)[0].done).toBe(true);
+    expect(toggleItem(items, items[0].id)[0].done).toBe(true);
+  });
+
+  it("re-opens a finished task without rolling it anywhere", () => {
+    let items = addRepeating({ freq: "daily", count: 1 });
+    items = completeItem(items, items[0].id, at(2026, 3, 10, 9, 5));
+    const [back] = toggleItem(items, items[0].id);
+    expect(back.done).toBe(false);
+    expect(parts(back.due)).toEqual([2026, 3, 10, 9, 0]);
+  });
+
+  it("edits the rule, and drops it when the date goes", () => {
+    const items = addRepeating("daily");
+    const id = items[0].id;
+    expect(editItem(items, id, { repeat: "weekly" })[0].repeat.freq).toBe("weekly");
+    expect(editItem(items, id, { repeat: "" })[0].repeat).toBeNull();
+    expect(editItem(items, id, { due: "" })[0].repeat).toBeNull();
+    // an edit that says nothing about the repeat leaves it alone
+    expect(editItem(items, id, { title: "Renamed" })[0].repeat.freq).toBe("daily");
+  });
+});
+
+/* ---------- imported from a calendar ---------- */
+
+describe("store: mergeImported", () => {
+  const now = at(2026, 3, 10, 8, 0);
+  const draft = (over = {}) => ({
+    extId: "ev-1",
+    title: "Dentist",
+    due: at(2026, 3, 11, 14, 0),
+    repeat: null,
+    allDay: false,
+    ...over,
+  });
+
+  it("adds an event as a task, marked with where it came from", () => {
+    const res = mergeImported([], [draft()], { now });
+    expect(res.added).toBe(1);
+    expect(res.items[0]).toMatchObject({
+      title: "Dentist",
+      extId: "ev-1",
+      source: "calendar",
+      done: false,
+      prio: "med",
+    });
+  });
+
+  it("updates the same event rather than duplicating it", () => {
+    const first = mergeImported([], [draft()], { now }).items;
+    const again = mergeImported(first, [draft()], { now });
+    expect(again.items).toHaveLength(1);
+    expect(again.added).toBe(0);
+    expect(again.updated).toBe(0); // nothing changed, so nothing to write
+
+    const moved = mergeImported(first, [draft({ due: at(2026, 3, 12, 15, 0) })], { now });
+    expect(moved.items).toHaveLength(1);
+    expect(moved.updated).toBe(1);
+    expect(parts(moved.items[0].due)).toEqual([2026, 3, 12, 15, 0]);
+  });
+
+  it("re-opens and re-arms a task whose event was moved", () => {
+    let items = mergeImported([], [draft()], { now }).items;
+    items = completeItem(items, items[0].id, now);
+    items = markAlerted(items, items[0].id, "due");
+    const res = mergeImported(items, [draft({ due: at(2026, 3, 13, 9, 0) })], { now });
+    expect(res.items[0]).toMatchObject({ done: false, alertedAt: null, preAlertedAt: null });
+  });
+
+  it("follows a renamed event without touching the rest of the task", () => {
+    let items = mergeImported([], [draft()], { now }).items;
+    items = editItem(items, items[0].id, { prio: "high" });
+    const res = mergeImported(items, [draft({ title: "Dentist (moved rooms)" })], { now });
+    expect(res.items[0].title).toBe("Dentist (moved rooms)");
+    expect(res.items[0].prio).toBe("high"); // the user's own edit survives
+  });
+
+  it("carries a repeat rule in and notices when it changes", () => {
+    const first = mergeImported([], [draft({ repeat: "weekly" })], { now });
+    expect(first.items[0].repeat.freq).toBe("weekly");
+    const res = mergeImported(first.items, [draft({ repeat: "daily" })], { now });
+    expect(res.updated).toBe(1);
+    expect(res.items[0].repeat.freq).toBe("daily");
+  });
+
+  it("leaves the user's own tasks completely alone", () => {
+    const mine = addItem([], { title: "My own thing", due: new Date(at(2026, 3, 11)) });
+    const res = mergeImported(mine, [draft()], { now, prune: true });
+    expect(res.items).toHaveLength(2);
+    expect(res.items[0].title).toBe("My own thing");
+    expect(res.removed).toBe(0);
+  });
+
+  it("drops a previously-synced task when the event is gone, but only if asked", () => {
+    const items = mergeImported([], [draft(), draft({ extId: "ev-2", title: "Haircut" })], { now }).items;
+    expect(mergeImported(items, [draft()], { now }).items).toHaveLength(2);
+
+    const pruned = mergeImported(items, [draft()], { now, prune: true });
+    expect(pruned.items.map((t) => t.extId)).toEqual(["ev-1"]);
+    expect(pruned.removed).toBe(1);
+  });
+
+  it("only prunes within the source it was given", () => {
+    const items = mergeImported([], [draft()], { now, source: "work" }).items;
+    const res = mergeImported(items, [], { now, source: "home", prune: true });
+    expect(res.items).toHaveLength(1);
+  });
+
+  it("ignores empty drafts and a missing list", () => {
+    expect(mergeImported([], null, { now }).items).toEqual([]);
+    expect(mergeImported([], [null, { title: "" }], { now }).added).toBe(0);
   });
 });

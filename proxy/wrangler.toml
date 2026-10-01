@@ -1,0 +1,9 @@
+name = "todo-cal-proxy"
+main = "worker.mjs"
+compatibility_date = "2026-09-01"
+
+# Only the app's own origin may read the response. Change this if the app moves
+# to another address, or set it to "*" to allow any.
+[vars]
+ALLOWED_ORIGINS = "https://todo-app-qpd5.onrender.com"
+# EXTRA_HOSTS = "cal.example.com"   # another calendar provider, if ever needed

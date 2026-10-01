@@ -1,0 +1,15 @@
+{
+  "name": "todo-cal-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reads a published calendar and returns it with permission for the app to read it.",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "license": "MIT"
+}

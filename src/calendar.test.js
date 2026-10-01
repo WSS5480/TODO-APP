@@ -171,3 +171,30 @@ describe("icsFilename", () => {
     expect(icsFilename("x".repeat(200)).length).toBeLessThanOrEqual(44);
   });
 });
+
+describe("repeating events", () => {
+  it("writes an RRULE for a repeating task", () => {
+    const lines = buildEvent(task({ repeat: { freq: "weekdays" } }));
+    expect(lines).toContain("RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+  });
+
+  it("carries the end of the series into the rule", () => {
+    const lines = buildEvent(task({ repeat: { freq: "daily", interval: 2, count: 6 } }));
+    expect(lines).toContain("RRULE:FREQ=DAILY;INTERVAL=2;COUNT=6");
+  });
+
+  it("writes no rule for a one-off task", () => {
+    const lines = buildEvent(task());
+    expect(lines.some((l) => l.startsWith("RRULE"))).toBe(false);
+    expect(buildEvent(task({ repeat: null })).some((l) => l.startsWith("RRULE"))).toBe(false);
+  });
+
+  it("keeps the alarms with the repeating event, so each occurrence rings", () => {
+    const lines = buildEvent(task({ repeat: "daily" }), { leadMinutes: 10 });
+    expect(lines.filter((l) => l === "BEGIN:VALARM")).toHaveLength(2);
+    // the rule must come before the alarms, which belong to the event body
+    expect(lines.findIndex((l) => l.startsWith("RRULE"))).toBeLessThan(
+      lines.indexOf("BEGIN:VALARM"),
+    );
+  });
+});
