@@ -15,6 +15,11 @@ export const APP_VERSION =
 export const APP_BUILT_AT =
   typeof __APP_BUILT_AT__ === "string" ? Number(__APP_BUILT_AT__) || 0 : 0;
 
+// A release name bumped by hand when features land. The hash above changes with
+// every byte of the build; this says which set of changes you are looking at,
+// which is what makes "did my update deploy?" answerable from the header.
+export const APP_RELEASE = "v2";
+
 // Only a strictly newer build counts.
 //
 // Comparing versions for mere inequality looks right and is not: a CDN or an

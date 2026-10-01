@@ -1,13 +1,18 @@
 import {
   load, save, loadPrefs, savePrefs,
   addItem, toggleItem, completeItem, removeItem, clearDone, editItem,
-  snoozeItem, dueAlerts, markAlerted, fmtIn, alertSound,
+  snoozeItem, dueAlerts, markAlerted, fmtIn, alertSound, mergeImported,
 } from "./store.js";
 import { renderList } from "./render.js";
 import { canNotify, requestPermission, sendNotification, toast } from "./notify.js";
 import { setSoundEnabled, unlockAudio, playChime, playSound, SOUNDS, SOUND_NAMES } from "./sound.js";
-import { APP_VERSION, APP_BUILT_AT, isOutdated, fetchDeployedVersion, reloadToVersion } from "./update.js";
+import {
+  APP_VERSION, APP_RELEASE, APP_BUILT_AT, isOutdated, fetchDeployedVersion, reloadToVersion,
+} from "./update.js";
 import { buildCalendar, countExportable, icsFilename } from "./calendar.js";
+import { REPEAT_CHOICES } from "./recur.js";
+import { tasksFromIcs } from "./icsparse.js";
+import { fetchCalendar, normalizeFeedUrl, DEFAULT_PROXY } from "./calsync.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
@@ -23,7 +28,21 @@ const leadEl = $("lead");
 const dueSoundEl = $("dueSound");
 const soonSoundEl = $("soonSound");
 const repeatEl = $("repeat");
+const taskRepeatEl = $("taskRepeat");
 const taskSoundEl = $("taskSound");
+const buildEl = $("build");
+const calUrlEl = $("calUrl");
+const calSyncBtn = $("calSyncBtn");
+const calEveryEl = $("calEvery");
+const calPruneEl = $("calPrune");
+const calProxyEl = $("calProxy");
+const calFileBtn = $("calFileBtn");
+const calFileEl = $("calFile");
+const calPasteBtn = $("calPasteBtn");
+const calPasteBox = $("calPasteBox");
+const calTextEl = $("calText");
+const calTextBtn = $("calTextBtn");
+const calStatusEl = $("calStatus");
 const updateEl = $("update");
 const updateBtn = $("updateBtn");
 const updateDismiss = $("updateDismiss");
@@ -138,6 +157,26 @@ function soundsInUse() {
 
 fillSounds(taskSoundEl, { withDefault: true });
 
+// The repeat picker in the add form, from the same list the edit form uses.
+for (const [value, label] of REPEAT_CHOICES) {
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = value === "" ? "Once" : label;
+  taskRepeatEl.appendChild(opt);
+}
+
+// A repeat has nothing to count from without a due date, so the picker follows
+// the date field rather than silently discarding what was chosen.
+function syncRepeatPicker() {
+  const hasDate = !!whenEl.value;
+  taskRepeatEl.disabled = !hasDate;
+  if (!hasDate) taskRepeatEl.value = "";
+  taskRepeatEl.title = hasDate ? "Repeat" : "Set a due date to repeat this task";
+}
+
+whenEl.addEventListener("change", syncRepeatPicker);
+whenEl.addEventListener("input", syncRepeatPicker);
+
 function syncSettingsUI() {
   soundBtn.textContent = prefs.sound ? "Sound on" : "Sound off";
   soundBtn.classList.toggle("on", prefs.sound);
@@ -146,6 +185,10 @@ function syncSettingsUI() {
   syncPicker(dueSoundEl, () => prefs.dueSound);
   syncPicker(soonSoundEl, () => prefs.soonSound);
   repeatEl.value = String(prefs.repeat);
+  calUrlEl.value = prefs.calUrl || "";
+  calEveryEl.value = String(prefs.calEvery);
+  calPruneEl.checked = !!prefs.calPrune;
+  calProxyEl.value = prefs.calProxy || "";
   setSoundEnabled(prefs.sound);
 }
 
@@ -207,11 +250,14 @@ formEl.addEventListener("submit", (e) => {
     due: whenEl.value || null,
     prio: prioEl.value,
     sound: taskSoundEl.value || null,
+    repeat: taskRepeatEl.value || null,
   });
   taskEl.value = "";
   whenEl.value = "";
   prioEl.value = "med";
   taskSoundEl.value = "";
+  taskRepeatEl.value = "";
+  syncRepeatPicker();
   taskEl.focus();
   persist();
 });
@@ -264,6 +310,7 @@ listEl.addEventListener("submit", (e) => {
     due: data.get("due") || null,
     prio: data.get("prio"),
     sound: data.get("sound") || null,
+    repeat: data.get("repeat") || null,
   });
   editingId = null;
   persist();
@@ -310,6 +357,173 @@ function syncExportBtn() {
 }
 
 exportBtn.addEventListener("click", () => exportItems(items, "to-do-reminder.ics"));
+
+/* ---------- calendar import and pull ---------- */
+
+// Everything in this section ends up in the same place: drafts from icsparse.js
+// merged into the list by mergeImported, which keys on the calendar's own UID so
+// pulling twice updates the tasks instead of duplicating them.
+
+let pulling = false;
+let pullTimer = null;
+
+function calStatus(message, kind = "") {
+  calStatusEl.textContent = message;
+  calStatusEl.className = `sound-hint ${kind}`.trim();
+}
+
+function describeMerge({ added, updated, removed }, found) {
+  if (!added && !updated && !removed) {
+    return found ? "Already up to date." : "No upcoming events in that calendar.";
+  }
+  const bits = [];
+  if (added) bits.push(`${added} new`);
+  if (updated) bits.push(`${updated} changed`);
+  if (removed) bits.push(`${removed} removed`);
+  return `${bits.join(", ")}.`;
+}
+
+// Shared by the file, the pasted text and the network pull.
+function importText(text, { source = "calendar", prune = false } = {}) {
+  const { tasks, found, calendarName } = tasksFromIcs(text);
+  if (!found) {
+    calStatus("That file has no events in it.", "bad");
+    return null;
+  }
+  const result = mergeImported(items, tasks, { source, prune });
+  items = result.items;
+  persist();
+  return { result, found, calendarName };
+}
+
+calFileBtn.addEventListener("click", () => calFileEl.click());
+
+calFileEl.addEventListener("change", async () => {
+  const file = calFileEl.files && calFileEl.files[0];
+  if (!file) return;
+  calStatus(`Reading ${file.name}…`);
+  try {
+    const outcome = importText(await file.text());
+    if (outcome) {
+      calStatus(`${file.name}: ${describeMerge(outcome.result, outcome.found)}`, "good");
+      toast(`Imported from ${outcome.calendarName || file.name}`);
+    }
+  } catch {
+    calStatus("That file could not be read.", "bad");
+  } finally {
+    calFileEl.value = ""; // so picking the same file again still fires
+  }
+});
+
+calPasteBtn.addEventListener("click", () => {
+  calPasteBox.hidden = !calPasteBox.hidden;
+  if (!calPasteBox.hidden) calTextEl.focus();
+});
+
+calTextBtn.addEventListener("click", () => {
+  const text = calTextEl.value.trim();
+  if (!text) {
+    calStatus("Paste the calendar text first.", "bad");
+    return;
+  }
+  const outcome = importText(text);
+  if (outcome) {
+    calStatus(describeMerge(outcome.result, outcome.found), "good");
+    calTextEl.value = "";
+    calPasteBox.hidden = true;
+  }
+});
+
+calUrlEl.addEventListener("change", () => {
+  const raw = calUrlEl.value.trim();
+  const url = normalizeFeedUrl(raw);
+  if (raw && !url) {
+    calStatus("That does not look like a calendar link.", "bad");
+    return;
+  }
+  prefs = { ...prefs, calUrl: url };
+  savePrefs(prefs);
+  calUrlEl.value = url;
+  armAutoPull();
+  if (url) calStatus("Saved. Tap “Pull now” to try it.");
+});
+
+calEveryEl.addEventListener("change", () => {
+  prefs = { ...prefs, calEvery: Number(calEveryEl.value) || 0 };
+  savePrefs(prefs);
+  armAutoPull();
+});
+
+calProxyEl.addEventListener("change", () => {
+  const raw = calProxyEl.value.trim();
+  // Blank means "use the one the app ships with", which is the normal case.
+  const url = raw ? normalizeFeedUrl(raw) : "";
+  if (raw && !url) {
+    calStatus("That does not look like an address.", "bad");
+    return;
+  }
+  prefs = { ...prefs, calProxy: url };
+  savePrefs(prefs);
+  calProxyEl.value = url;
+});
+
+calPruneEl.addEventListener("change", () => {
+  prefs = { ...prefs, calPrune: calPruneEl.checked };
+  savePrefs(prefs);
+});
+
+// `quiet` is for the automatic pull, which should not shout about a calendar
+// that happens to be unreachable while the app sits open.
+async function pullCalendar({ quiet = false } = {}) {
+  if (pulling || !prefs.calUrl) return;
+  pulling = true;
+  calSyncBtn.disabled = true;
+  if (!quiet) calStatus("Reading your calendar…");
+
+  try {
+    const res = await fetchCalendar(prefs.calUrl, { proxy: prefs.calProxy || DEFAULT_PROXY });
+    if (!res.ok) {
+      if (!quiet) calStatus(res.error, "bad");
+      return;
+    }
+
+    const merge = mergeImported(items, res.tasks, { source: "calendar", prune: prefs.calPrune });
+    items = merge.items;
+    prefs = { ...prefs, calSyncedAt: Date.now() };
+    savePrefs(prefs);
+    persist();
+
+    const summary = describeMerge(merge, res.found);
+    if (!quiet || merge.added || merge.updated || merge.removed) {
+      calStatus(`${res.calendarName || "Calendar"} · ${summary}`, "good");
+    }
+    if (quiet && (merge.added || merge.updated)) {
+      toast(`Calendar updated — ${summary}`);
+    }
+  } finally {
+    pulling = false;
+    calSyncBtn.disabled = false;
+  }
+}
+
+calSyncBtn.addEventListener("click", () => pullCalendar());
+
+// The app has no background life of its own, so "automatic" means while it is
+// open, plus a catch-up pull whenever it comes back to the foreground.
+function armAutoPull() {
+  if (pullTimer) clearInterval(pullTimer);
+  pullTimer = null;
+  const minutes = Number(prefs.calEvery) || 0;
+  if (!minutes || !prefs.calUrl) return;
+  pullTimer = setInterval(() => pullCalendar({ quiet: true }), minutes * 60_000);
+}
+
+function pullIfStale() {
+  const minutes = Number(prefs.calEvery) || 0;
+  if (!minutes || !prefs.calUrl) return;
+  if (Date.now() - (prefs.calSyncedAt || 0) < minutes * 60_000) return;
+  pullCalendar({ quiet: true });
+}
 
 clearBtn.addEventListener("click", () => {
   items = clearDone(items);
@@ -372,11 +586,17 @@ function tick() {
 }
 
 syncSettingsUI();
+syncRepeatPicker();
 persist();
 tick();
 setInterval(tick, TICK_MS);
 window.addEventListener("focus", tick);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+
+armAutoPull();
+pullIfStale();
+window.addEventListener("focus", pullIfStale);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pullIfStale(); });
 
 if (canNotify() && Notification.permission === "granted") {
   notifyBtn.textContent = "Notifications on ✓";
@@ -419,4 +639,10 @@ setInterval(checkForUpdate, UPDATE_POLL_MS);
 window.addEventListener("focus", checkForUpdate);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
 
-console.info(`To Do Reminder build ${APP_VERSION} (${new Date(APP_BUILT_AT).toISOString()})`);
+// A visible stamp, so "did my change land?" is answerable at a glance.
+buildEl.textContent = `${APP_RELEASE} · ${APP_VERSION}`;
+buildEl.title = APP_BUILT_AT
+  ? `Built ${new Date(APP_BUILT_AT).toLocaleString()}`
+  : "Development build";
+
+console.info(`To Do Reminder ${APP_RELEASE} build ${APP_VERSION} (${new Date(APP_BUILT_AT).toISOString()})`);

@@ -1,5 +1,6 @@
 import { sortItems, dueClass, fmtWhen, toLocalInput } from "./store.js";
 import { SOUNDS, SOUND_NAMES } from "./sound.js";
+import { REPEAT_CHOICES, describeRepeat, isRepeating } from "./recur.js";
 
 const PRIOS = [
   ["low", "Low"],
@@ -61,6 +62,18 @@ function editRow(it) {
     sound.appendChild(opt);
   }
 
+  const repeat = document.createElement("select");
+  repeat.className = "edit-repeat";
+  repeat.name = "repeat";
+  repeat.setAttribute("aria-label", "Repeat");
+  for (const [value, label] of REPEAT_CHOICES) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    opt.selected = (it.repeat?.freq || "") === value;
+    repeat.appendChild(opt);
+  }
+
   const save = document.createElement("button");
   save.type = "submit";
   save.className = "save";
@@ -72,7 +85,7 @@ function editRow(it) {
   cancel.textContent = "Cancel";
   cancel.dataset.action = "cancel-edit";
 
-  form.append(title, when, prio, sound, save, cancel);
+  form.append(title, when, prio, repeat, sound, save, cancel);
   li.appendChild(form);
   return li;
 }
@@ -109,6 +122,23 @@ function taskRow(it) {
     const diff = it.due - Date.now();
     w.textContent = (diff < 0 ? "Overdue · " : "") + fmtWhen(it.due);
     meta.appendChild(w);
+  }
+
+  if (isRepeating(it.repeat)) {
+    const r = document.createElement("span");
+    r.className = "pill repeat";
+    r.textContent = "↻ " + describeRepeat(it.repeat, { short: true });
+    // the full rule, including how the series ends, on hover
+    r.title = describeRepeat(it.repeat);
+    meta.appendChild(r);
+  }
+
+  if (it.extId) {
+    const c = document.createElement("span");
+    c.className = "pill synced";
+    c.textContent = "From calendar";
+    c.title = "Synced from your calendar — it will follow changes made there";
+    meta.appendChild(c);
   }
 
   if (it.sound && SOUNDS[it.sound]) {

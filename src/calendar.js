@@ -6,6 +6,8 @@
 // closed, which the app's own alarms never can, because iOS suspends its timers
 // the moment you leave it.
 
+import { toRRULE } from "./recur.js";
+
 const PRODID = "-//To Do Reminder//EN";
 const CRLF = "\r\n";
 
@@ -85,6 +87,12 @@ export function buildEvent(item, { now = Date.now(), leadMinutes = 0 } = {}) {
     `PRIORITY:${PRIORITY[item.prio] ?? PRIORITY.med}`,
     `STATUS:${item.done ? "CANCELLED" : "CONFIRMED"}`,
   ];
+
+  // A repeating task becomes one repeating event, so a single export carries
+  // every future alarm instead of only the next one. The alarms below belong to
+  // the event, which means Calendar re-arms them for each occurrence.
+  const rrule = toRRULE(item.repeat);
+  if (rrule) lines.push(`RRULE:${rrule}`);
 
   if (!item.done) {
     lines.push(...alarm("PT0S", item.title));
