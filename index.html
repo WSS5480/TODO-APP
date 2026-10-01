@@ -35,7 +35,10 @@
         <button id="settingsBtn" class="gear" type="button"
                 aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">&#9881;</button>
       </div>
-      <div class="sub">Local-only. Keep this tab open and alarms ring at the due time.</div>
+      <div class="sub">
+        Keep this tab open and alarms ring at the due time.
+        <span class="build" id="build"></span>
+      </div>
     </header>
     <form id="form">
       <input id="task" type="text" placeholder="What needs doing?" required maxlength="200" />
@@ -45,6 +48,8 @@
         <option value="med" selected>Medium</option>
         <option value="high">High</option>
       </select>
+      <!-- options filled from recur.js in main.js -->
+      <select id="taskRepeat" title="Repeat (needs a due date)"></select>
       <!-- options filled from the sound library in main.js -->
       <select id="taskSound" title="Alarm for this task (optional)"></select>
       <button type="submit">Add</button>
@@ -84,6 +89,57 @@
         <div class="sound-picker" id="soonSound" role="radiogroup" aria-label="Heads-up sound"></div>
       </div>
       <p class="sound-hint">Tap any sound to hear it.</p>
+
+      <!-- Calendar: out to the phone's calendar, and back in from it. A web page
+           cannot read the iPhone calendar directly — iOS only gives that to
+           native apps — so the way in is a published calendar link or a file. -->
+      <div class="cal-group">
+        <span class="sound-label">Pull from your calendar</span>
+        <div class="cal-row">
+          <input id="calUrl" type="url" inputmode="url" autocapitalize="off" spellcheck="false"
+                 placeholder="Published iCloud calendar link" aria-label="Published calendar link" />
+          <button class="ghost" id="calSyncBtn" type="button">Pull now</button>
+        </div>
+        <label class="lead">Check
+          <select id="calEvery" title="How often to pull the calendar while the app is open">
+            <option value="0">only when I ask</option>
+            <option value="15">every 15 min</option>
+            <option value="60" selected>every hour</option>
+            <option value="360">every 6 hours</option>
+          </select>
+        </label>
+        <label class="cal-check">
+          <input type="checkbox" id="calPrune" />
+          Remove tasks when the event is deleted
+        </label>
+        <div class="cal-row">
+          <button class="ghost" id="calFileBtn" type="button">Import a .ics file</button>
+          <input id="calFile" type="file" accept=".ics,text/calendar" hidden />
+          <button class="ghost" id="calPasteBtn" type="button">Paste calendar text</button>
+        </div>
+        <div class="cal-paste" id="calPasteBox" hidden>
+          <textarea id="calText" rows="4" spellcheck="false"
+                    placeholder="Paste the contents of a .ics file here"
+                    aria-label="Calendar text"></textarea>
+          <button class="ghost" id="calTextBtn" type="button">Import pasted text</button>
+        </div>
+        <details class="cal-adv">
+          <summary>Reader service</summary>
+          <p class="sound-hint">
+            iCloud will not let a web page read its calendars directly, so a tiny
+            service fetches the file and passes it back. Leave this blank to use
+            the built-in one.
+          </p>
+          <div class="cal-row">
+            <input id="calProxy" type="url" inputmode="url" autocapitalize="off" spellcheck="false"
+                   placeholder="https://…/ics" aria-label="Reader service address" />
+          </div>
+        </details>
+        <p class="sound-hint" id="calStatus">
+          In Calendar on your iPhone: tap the calendar's &#9432; button, turn on
+          <b>Public Calendar</b>, copy the link and paste it here.
+        </p>
+      </div>
     </section>
     <div class="toolbar">
       <span id="count">0 active</span>

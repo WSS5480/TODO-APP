@@ -83,12 +83,27 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
 }
 .settings-panel .settings { margin-bottom: 4px; }
 .sub { color: rgba(255, 255, 255, .72); font-size: .85rem; }
+.build {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  color: rgba(255, 255, 255, .8);
+  font-size: .68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
 
 /* the add-task form; scoped by id so the inline edit form (also a <form>)
    does not get a second card background nested inside its row */
 #form {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  /* Flex rather than a fixed column count: the row holds a different number of
+     controls as the app grows, and wrapping handles that without a rule per
+     field. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   background: var(--card);
   border: 1px solid var(--line);
@@ -175,6 +190,8 @@ li.due-soon { border-left-color: var(--gold); }
 .pill.overdue { color: #fff; border-color: var(--bad); background: var(--bad); }
 .pill.due-soon { color: var(--gold-ink); border-color: var(--gold); background: var(--gold-soft); }
 .pill.sound { color: var(--navy); border-color: var(--line); background: var(--bg); }
+.pill.repeat { color: var(--navy); border-color: var(--line); background: var(--bg); }
+.pill.synced { color: var(--mut); border-color: var(--line); background: var(--bg); }
 
 /* ---- new version banner ---- */
 .update {
@@ -206,6 +223,12 @@ li.due-soon { border-left-color: var(--gold); }
   min-height: 40px;
 }
 .update .update-x:hover { background: none; color: #fff; }
+
+/* field sizing for both forms, now that they wrap */
+#task { flex: 1 1 12rem; min-width: 0; }
+.edit-title { flex: 1 1 10rem; min-width: 0; }
+#form select, .edit-form select, #when, .edit-when { flex: 0 1 auto; min-width: 0; }
+#form button[type="submit"] { margin-left: auto; }
 
 /* ---- alarm sound picker ---- */
 .sound-group { margin: 10px 0 4px; }
@@ -247,6 +270,59 @@ li.due-soon { border-left-color: var(--gold); }
   font-size: .76rem;
   color: var(--mut);
 }
+.sound-hint.good { color: var(--good); }
+.sound-hint.bad { color: var(--bad); }
+
+/* ---- calendar pull ---- */
+.cal-group {
+  margin: 14px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.cal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cal-row input[type="url"] {
+  /* the link is long and unreadable; let it take the whole row on a phone */
+  flex: 1 1 15rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: .85rem;
+}
+.cal-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .82rem;
+  color: var(--ink);
+  margin: 2px 0 10px;
+  min-height: 36px;
+}
+.cal-check input { width: 18px; height: 18px; accent-color: var(--brand); }
+.cal-paste { margin-bottom: 8px; }
+.cal-paste textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .76rem;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+.cal-group .lead { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; }
+.cal-group button.ghost { padding: 6px 10px; font-size: .82rem; }
 .del {
   background: none;
   border: none;
@@ -278,8 +354,8 @@ li.due-soon { border-left-color: var(--gold); }
 /* inline edit form (replaces the row's contents while editing) */
 li.editing { border-left-color: var(--navy); }
 .edit-form {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
   align-items: center;
@@ -323,12 +399,12 @@ li.editing { border-left-color: var(--navy); }
 .edit-form .cancel:hover { color: var(--ink); }
 
 @media (max-width: 560px) {
-  /* stack the fields and put Save / Cancel side by side on the last row */
-  .edit-form { grid-template-columns: 1fr 1fr; }
-  .edit-when, .edit-prio, .edit-sound { grid-column: 1 / -1; }
-  /* the add form's four controls do not fit one phone row */
-  #form { grid-template-columns: 1fr 1fr; }
-  #when, #form button[type="submit"] { grid-column: 1 / -1; }
+  /* On a phone the text field and the date each take a row of their own, the
+     dropdowns pair up, and the buttons finish on the last row. */
+  #task, #when, .edit-title, .edit-when { flex: 1 1 100%; }
+  #form select, .edit-form select { flex: 1 1 8rem; }
+  #form button[type="submit"] { flex: 1 1 100%; margin-left: 0; }
+  .edit-form .save, .edit-form .cancel { flex: 1 1 40%; }
 }
 .empty {
   text-align: center;
@@ -402,3 +478,13 @@ button.toggle.on:hover { color: var(--good); border-color: var(--good); }
 .toast button { padding: 6px 10px; font-size: .8rem; }
 .toast button.ghost { color: #fff; border-color: rgba(255, 255, 255, .4); background: transparent; }
 .toast button.ghost:hover { background: rgba(255, 255, 255, .1); border-color: #fff; color: #fff; }
+.cal-adv { margin: 6px 0 2px; }
+.cal-adv summary {
+  font-size: .78rem;
+  color: var(--mut);
+  cursor: pointer;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.cal-adv summary:hover { color: var(--ink); }
