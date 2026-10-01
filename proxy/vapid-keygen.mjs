@@ -12,18 +12,67 @@
 // chat window, or in wrangler.toml — only in `wrangler secret`, which is what
 // the commands below use.
 
+import { writeFileSync } from "node:fs";
 import { generateVapidKeys } from "./push.mjs";
 
 const { publicKey, privateKey } = await generateVapidKeys();
 
 const subject = process.argv[2] || "mailto:you@example.com";
 
-console.log(`
-A new VAPID keypair. Run these three commands from this folder:
+// Each value also goes to its own file, and a script feeds those files to
+// wrangler with `<`. Typing or pasting a 43-character key three times into a
+// prompt is where this goes wrong, and a key with one stray character fails
+// silently — the only symptom is a notification that never arrives.
+//
+// The files hold a credential, so the script deletes them the moment the
+// secrets are stored, and .gitignore keeps them out of the repository.
+writeFileSync(".vapid-private.txt", privateKey);
+writeFileSync(".vapid-public.txt", publicKey);
+writeFileSync(".vapid-subject.txt", subject);
 
-  echo "${privateKey}" | npx wrangler secret put VAPID_PRIVATE_KEY
-  echo "${publicKey}" | npx wrangler secret put VAPID_PUBLIC_KEY
-  echo "${subject}" | npx wrangler secret put VAPID_SUBJECT
+writeFileSync(
+  "set-secrets.bat",
+  [
+    "@echo off",
+    "cd /d \"%~dp0\"",
+    "echo Storing the three secrets with Cloudflare ...",
+    "echo.",
+    "call npx wrangler secret put VAPID_PRIVATE_KEY < .vapid-private.txt || goto :failed",
+    "call npx wrangler secret put VAPID_PUBLIC_KEY < .vapid-public.txt || goto :failed",
+    "call npx wrangler secret put VAPID_SUBJECT < .vapid-subject.txt || goto :failed",
+    "del /q .vapid-private.txt .vapid-public.txt .vapid-subject.txt >nul 2>&1",
+    "echo.",
+    "echo Done. The key files have been deleted.",
+    "echo Check with:  npx wrangler secret list",
+    "pause",
+    "exit /b 0",
+    ":failed",
+    "echo.",
+    "echo Something went wrong - the key files have been left in place so you",
+    "echo can run this again. Delete them yourself if you give up on it.",
+    "pause",
+    "exit /b 1",
+    "",
+  ].join("\r\n"),
+);
+
+// Printed as command-then-value rather than piped from `echo`, because
+// Command Prompt echoes the quotes and a trailing space along with the value.
+// A key stored with a stray quote fails to decode, and the only symptom is a
+// notification that never arrives.
+console.log(`
+A new VAPID keypair, written to three files in this folder.
+
+Now run this, which stores all three with Cloudflare and then deletes the
+files:
+
+    set-secrets.bat
+
+Nothing to copy or paste. When it finishes, check with:
+
+    npx wrangler secret list
+
+Contact address for the push services: ${subject}
 `);
 
 if (!process.argv[2]) {

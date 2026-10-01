@@ -6,3 +6,8 @@ Thumbs.db
 .vscode/
 .idea/
 coverage/
+
+# VAPID key material, written by proxy/vapid-keygen.mjs and deleted by
+# set-secrets.bat. Never let these reach the repository.
+.vapid-*.txt
+set-secrets.bat

@@ -18,7 +18,7 @@ ALLOWED_ORIGINS = "https://todo-app-qpd5.onrender.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "todo-push"
-database_id = "PASTE_THE_ID_FROM_WRANGLER_D1_CREATE"
+database_id = "2379164d-20f9-46ad-a230-7e04de6f7e25"
 
 # The alarm clock. Once a minute is the finest cron allows, and it is what lets
 # a reminder fire while the app is closed — nothing is running on the phone, so

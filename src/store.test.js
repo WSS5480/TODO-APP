@@ -478,3 +478,42 @@ describe("store: mergeImported", () => {
     expect(mergeImported([], [null, { title: "" }], { now }).added).toBe(0);
   });
 });
+
+describe("store: importing history", () => {
+  const now = at(2026, 3, 10, 12, 0);
+
+  it("keeps a past event ticked off, and an upcoming one open", () => {
+    const res = mergeImported(
+      [],
+      [
+        { extId: "old", title: "Last year's review", due: at(2025, 3, 10, 9, 0), done: true },
+        { extId: "new", title: "Next week's review", due: at(2026, 3, 17, 9, 0), done: false },
+      ],
+      { now },
+    );
+    expect(res.items.map((t) => [t.title, t.done])).toEqual([
+      ["Last year's review", true],
+      ["Next week's review", false],
+    ]);
+  });
+
+  it("treats a draft with no done flag as open", () => {
+    const res = mergeImported([], [{ extId: "x", title: "Thing", due: at(2026, 3, 17) }], { now });
+    expect(res.items[0].done).toBe(false);
+  });
+
+  it("counts imported history as done, so the active count stays honest", () => {
+    const res = mergeImported(
+      [],
+      Array.from({ length: 5 }, (_, i) => ({
+        extId: `h${i}`,
+        title: `History ${i}`,
+        due: at(2025, 3, 10) + i * 1000,
+        done: true,
+      })),
+      { now },
+    );
+    expect(res.items.filter((t) => !t.done)).toHaveLength(0);
+    expect(clearDone(res.items)).toEqual([]);
+  });
+});

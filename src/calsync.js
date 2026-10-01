@@ -18,6 +18,11 @@ import { tasksFromIcs } from "./icsparse.js";
 
 export const DEFAULT_TIMEOUT_MS = 20_000;
 
+// What a one-off "bring in everything" will take. Far above the routine pull's
+// ceiling, and still a stop so a shared calendar with a decade of history
+// cannot wedge the app.
+export const MAX_HISTORY_EVENTS = 5000;
+
 // The companion service that reads the feed on the app's behalf. It holds no
 // data and no credentials — it fetches a public .ics and returns it — so the
 // app can ship knowing where it is. On a free plan it sleeps when idle, which
@@ -92,6 +97,7 @@ export async function fetchCalendar(
     fetchImpl = globalThis.fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     max,
+    includePast = false,
   } = {},
 ) {
   const url = normalizeFeedUrl(feedUrl);
@@ -111,7 +117,7 @@ export async function fetchCalendar(
         lastError = "That address returned something that is not a calendar.";
         continue;
       }
-      const { tasks, calendarName, found } = tasksFromIcs(text, { now, max });
+      const { tasks, calendarName, found } = tasksFromIcs(text, { now, max, includePast });
       return { ok: true, tasks, found, calendarName, via, error: "" };
     } catch (err) {
       lastError = describeError(err, via);

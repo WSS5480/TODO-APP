@@ -18,7 +18,7 @@ export const APP_BUILT_AT =
 // A release name bumped by hand when features land. The hash above changes with
 // every byte of the build; this says which set of changes you are looking at,
 // which is what makes "did my update deploy?" answerable from the header.
-export const APP_RELEASE = "v3";
+export const APP_RELEASE = "v4";
 
 // Only a strictly newer build counts.
 //

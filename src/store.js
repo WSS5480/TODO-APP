@@ -181,7 +181,8 @@ export function mergeImported(items, drafts, { now = Date.now(), source = "calen
         repeat: normalizeRepeat(draft.repeat),
         prio: "med",
         sound: null,
-        done: false,
+        // A calendar event that already happened arrives ticked off.
+        done: !!draft.done,
         createdAt: now,
         alertedAt: null,
         preAlertedAt: null,

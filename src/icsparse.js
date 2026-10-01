@@ -223,8 +223,16 @@ export function parseIcs(text, { allDayHour = ALL_DAY_HOUR } = {}) {
 // of it is a todo. A repeating event whose series started in the past is not
 // history though: it is rolled forward to its next occurrence, which is the one
 // that still needs doing.
-export function eventsToTasks(events, { now = Date.now(), since = null, max = DEFAULT_MAX_EVENTS } = {}) {
-  const floor = since === null ? startOfDay(now) : since;
+export function eventsToTasks(
+  events,
+  { now = Date.now(), since = null, max = DEFAULT_MAX_EVENTS, includePast = false } = {},
+) {
+  // Two different lines. `today` is what makes something history — it decides
+  // whether a task arrives already ticked off, and it is where a repeating
+  // series gets rolled forward to. `floor` is only how far back this import
+  // reaches, which the caller widens for a one-off "bring in everything".
+  const today = startOfDay(now);
+  const floor = includePast ? -Infinity : since === null ? today : since;
   const out = [];
 
   for (const ev of events) {
@@ -233,10 +241,11 @@ export function eventsToTasks(events, { now = Date.now(), since = null, max = DE
     let due = ev.due;
     let repeat = normalizeRepeat(ev.repeat);
 
-    if (repeat && due < floor) {
-      // first occurrence at or after the cut-off — the same test the one-off
-      // events below get, so both kinds of event survive the filter alike
-      const next = nextOccurrence(due, repeat, floor - 1);
+    // A repeating event is a live thing whatever the import reaches back to:
+    // it comes in at its next occurrence rather than as a pile of history, and
+    // one task carries the whole series.
+    if (repeat && due < today) {
+      const next = nextOccurrence(due, repeat, today - 1);
       if (!next) continue; // the series finished in the past
       due = next.due;
       repeat = next.repeat;
@@ -250,6 +259,9 @@ export function eventsToTasks(events, { now = Date.now(), since = null, max = DE
       due,
       repeat,
       allDay: ev.allDay,
+      // Something that already happened is not a todo. It comes in done, so it
+      // is there to look up without crowding what still needs doing.
+      done: due < today,
     });
     if (out.length >= max) break;
   }

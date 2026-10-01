@@ -12,7 +12,7 @@ import {
 import { buildCalendar, countExportable, icsFilename } from "./calendar.js";
 import { REPEAT_CHOICES } from "./recur.js";
 import { tasksFromIcs } from "./icsparse.js";
-import { fetchCalendar, normalizeFeedUrl, DEFAULT_PROXY } from "./calsync.js";
+import { fetchCalendar, normalizeFeedUrl, DEFAULT_PROXY, MAX_HISTORY_EVENTS } from "./calsync.js";
 import {
   canPush, pushState, describeState, serviceRoot, currentSubscription,
   enablePush, disablePush, syncAlarms, sendTestPush,
@@ -37,6 +37,7 @@ const taskSoundEl = $("taskSound");
 const buildEl = $("build");
 const calUrlEl = $("calUrl");
 const calSyncBtn = $("calSyncBtn");
+const calAllBtn = $("calAllBtn");
 const calEveryEl = $("calEvery");
 const calPruneEl = $("calPrune");
 const calProxyEl = $("calProxy");
@@ -516,6 +517,54 @@ async function pullCalendar({ quiet = false } = {}) {
 }
 
 calSyncBtn.addEventListener("click", () => pullCalendar());
+
+// The one-off. Everything the calendar holds, history included — anything
+// already past arrives ticked off, so it is there to look up without crowding
+// what still needs doing. Never pruned: this import is a superset, and
+// removing what it does not mention would be removing the user's own tasks.
+calAllBtn.addEventListener("click", async () => {
+  if (!prefs.calUrl) {
+    calStatus("Paste your calendar link above first.", "bad");
+    return;
+  }
+  if (pulling) return;
+
+  pulling = true;
+  calAllBtn.disabled = true;
+  calSyncBtn.disabled = true;
+  calStatus("Reading the whole calendar — this can take a moment…");
+
+  try {
+    const res = await fetchCalendar(prefs.calUrl, {
+      proxy: prefs.calProxy || DEFAULT_PROXY,
+      includePast: true,
+      max: MAX_HISTORY_EVENTS,
+    });
+    if (!res.ok) {
+      calStatus(res.error, "bad");
+      return;
+    }
+
+    const merge = mergeImported(items, res.tasks, { source: "calendar", prune: false });
+    items = merge.items;
+    prefs = { ...prefs, calSyncedAt: Date.now() };
+    savePrefs(prefs);
+    persist();
+
+    const past = res.tasks.filter((t) => t.done).length;
+    const ahead = res.tasks.length - past;
+    calStatus(
+      `${res.calendarName || "Calendar"} · ${describeMerge(merge, res.found)} ` +
+        `${ahead} still ahead, ${past} already past and ticked off.`,
+      "good",
+    );
+    toast(`Imported ${merge.added} from ${res.calendarName || "your calendar"}`);
+  } finally {
+    pulling = false;
+    calAllBtn.disabled = false;
+    calSyncBtn.disabled = false;
+  }
+});
 
 // The app has no background life of its own, so "automatic" means while it is
 // open, plus a catch-up pull whenever it comes back to the foreground.

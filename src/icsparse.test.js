@@ -312,3 +312,85 @@ describe("round trip with the exporter", () => {
     expect(standup.due).toBe(items[1].due);
   });
 });
+
+describe("eventsToTasks: the one-off import of everything", () => {
+  const now = at(2026, 5, 6, 12, 0);
+  const ev = (over = {}) => ({
+    uid: "e1",
+    title: "Thing",
+    due: at(2026, 5, 7, 9, 0),
+    allDay: false,
+    repeat: null,
+    cancelled: false,
+    ...over,
+  });
+
+  it("reaches back past today when asked", () => {
+    const events = [
+      ev({ uid: "old", title: "Last year", due: at(2025, 5, 6, 9, 0) }),
+      ev({ uid: "ancient", title: "Years ago", due: at(2019, 1, 2, 14, 0) }),
+      ev({ uid: "soon", title: "Tomorrow" }),
+    ];
+    const tasks = eventsToTasks(events, { now, includePast: true });
+    expect(tasks.map((t) => t.extId)).toEqual(["old", "ancient", "soon"]);
+  });
+
+  it("brings history in already ticked off, and leaves what is ahead open", () => {
+    const events = [
+      ev({ uid: "past", due: at(2025, 5, 6, 9, 0) }),
+      ev({ uid: "earlier-today", due: at(2026, 5, 6, 8, 0) }),
+      ev({ uid: "ahead" }),
+    ];
+    const tasks = eventsToTasks(events, { now, includePast: true });
+    expect(tasks.map((t) => [t.extId, t.done])).toEqual([
+      ["past", true],
+      // earlier today still counts as today, not history
+      ["earlier-today", false],
+      ["ahead", false],
+    ]);
+  });
+
+  it("still brings a repeating series in at its next occurrence, not as history", () => {
+    const events = [
+      ev({
+        uid: "standup",
+        title: "Standup",
+        due: at(2019, 1, 2, 9, 0),
+        repeat: { freq: "daily", interval: 1, until: null, count: null },
+      }),
+    ];
+    const [task] = eventsToTasks(events, { now, includePast: true });
+    expect(parts(task.due)).toEqual([2026, 5, 6, 9, 0]);
+    expect(task.done).toBe(false);
+    expect(task.repeat.freq).toBe("daily");
+  });
+
+  it("drops a repeating series that finished, however far the import reaches", () => {
+    const events = [
+      ev({
+        uid: "finished",
+        due: at(2019, 1, 2, 9, 0),
+        repeat: { freq: "daily", interval: 1, until: at(2019, 2, 1), count: null },
+      }),
+    ];
+    expect(eventsToTasks(events, { now, includePast: true })).toEqual([]);
+  });
+
+  it("leaves history behind by default, as a routine pull should", () => {
+    const events = [ev({ uid: "past", due: at(2025, 5, 6, 9, 0) }), ev({ uid: "ahead" })];
+    expect(eventsToTasks(events, { now }).map((t) => t.extId)).toEqual(["ahead"]);
+    expect(eventsToTasks(events, { now })[0].done).toBe(false);
+  });
+
+  it("still stops at the cap", () => {
+    const events = Array.from({ length: 40 }, (_, i) =>
+      ev({ uid: `e${i}`, due: at(2019, 1, 2, 9, 0) + i * 86_400_000 }),
+    );
+    expect(eventsToTasks(events, { now, includePast: true, max: 7 })).toHaveLength(7);
+  });
+
+  it("skips a cancelled event even when reaching into the past", () => {
+    const events = [ev({ uid: "off", due: at(2025, 5, 6), cancelled: true })];
+    expect(eventsToTasks(events, { now, includePast: true })).toEqual([]);
+  });
+});
