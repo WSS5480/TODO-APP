@@ -21,6 +21,7 @@ import {
   MAX_REDIRECTS,
   FETCH_TIMEOUT_MS,
 } from "./validate.mjs";
+import { handlePushRequest, runScheduler } from "./pushroutes.mjs";
 
 const CACHE_SECONDS = 300;
 
@@ -41,8 +42,24 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === "/healthz" || url.pathname === "/") {
-      return text(200, JSON.stringify({ ok: true, service: "todo-cal-proxy", runtime: "worker" }), "application/json");
+      return text(
+        200,
+        JSON.stringify({
+          ok: true,
+          service: "todo-cal-proxy",
+          runtime: "worker",
+          push: !!(env?.DB && env?.VAPID_PUBLIC_KEY),
+        }),
+        "application/json",
+      );
     }
+
+    if (url.pathname.startsWith("/push/")) {
+      const json = (status, value) => text(status, JSON.stringify(value), "application/json");
+      if (origin && !allow) return text(403, "this origin is not allowed to use this service");
+      return handlePushRequest(url.pathname, request, env, { reply: text, json });
+    }
+
     if (url.pathname !== "/ics") return text(404, "not found");
     if (request.method !== "GET") return text(405, "GET only");
     if (origin && !allow) return text(403, "this origin is not allowed to use this proxy");
@@ -89,6 +106,13 @@ export default {
     // Cache a copy without waiting for it to be written.
     await caches.default.put(cacheKey, res.clone());
     return res;
+  },
+
+  // The cron trigger in wrangler.toml, once a minute. This is the whole reason
+  // alarms can fire with the app closed: nothing on the phone is running, so
+  // something else has to be watching the clock.
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(runScheduler(env));
   },
 };
 

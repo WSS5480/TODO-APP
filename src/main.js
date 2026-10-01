@@ -13,6 +13,10 @@ import { buildCalendar, countExportable, icsFilename } from "./calendar.js";
 import { REPEAT_CHOICES } from "./recur.js";
 import { tasksFromIcs } from "./icsparse.js";
 import { fetchCalendar, normalizeFeedUrl, DEFAULT_PROXY } from "./calsync.js";
+import {
+  canPush, pushState, describeState, serviceRoot, currentSubscription,
+  enablePush, disablePush, syncAlarms, sendTestPush,
+} from "./push.js";
 
 const $ = (id) => document.getElementById(id);
 const listEl = $("list");
@@ -43,6 +47,10 @@ const calPasteBox = $("calPasteBox");
 const calTextEl = $("calText");
 const calTextBtn = $("calTextBtn");
 const calStatusEl = $("calStatus");
+const pushBtn = $("pushBtn");
+const pushStatusEl = $("pushStatus");
+const pushTestBtn = $("pushTestBtn");
+const pushOffBtn = $("pushOffBtn");
 const updateEl = $("update");
 const updateBtn = $("updateBtn");
 const updateDismiss = $("updateDismiss");
@@ -70,6 +78,7 @@ function persist() {
   renderList(listEl, countEl, items, editingId);
   updateTitle();
   syncExportBtn();
+  queueAlarmSync();
 }
 
 function focusEdit() {
@@ -539,6 +548,97 @@ notifyBtn.addEventListener("click", async () => {
   notifyBtn.disabled = perm === "granted";
 });
 
+/* ---------- alarms that ring with the app closed ---------- */
+
+// The app's own timers die the moment you leave it — iOS suspends the page.
+// What survives is a push: the reader service holds a list of times, its clock
+// ticks once a minute, and Apple delivers. All this side has to do is subscribe
+// and keep that list current.
+
+let pushOn = false;
+let alarmSyncTimer = null;
+
+function pushRoot() {
+  return serviceRoot(prefs.calProxy || DEFAULT_PROXY);
+}
+
+function pushStatus(message, kind = "") {
+  pushStatusEl.textContent = message;
+  pushStatusEl.className = `sound-hint ${kind}`.trim();
+}
+
+async function refreshPushUI({ message = "", kind = "" } = {}) {
+  const subscription = await currentSubscription().catch(() => null);
+  pushOn = !!subscription;
+  const state = pushState(globalThis, { subscribed: pushOn });
+
+  pushBtn.hidden = state === "on";
+  pushBtn.disabled = state === "unsupported" || state === "blocked" || state === "needs-install";
+  pushTestBtn.hidden = state !== "on";
+  pushOffBtn.hidden = state !== "on";
+
+  pushBtn.textContent = state === "needs-install" ? "Add to Home Screen first" : "Alarms when closed";
+  pushStatus(message || describeState(state), kind || (state === "on" ? "good" : ""));
+}
+
+// Permission must be asked for inside a tap: iOS refuses a prompt raised any
+// other way, and the refusal is indistinguishable from the user saying no.
+pushBtn.addEventListener("click", async () => {
+  pushBtn.disabled = true;
+  pushStatus("Asking your phone for permission…");
+  try {
+    await enablePush({ root: pushRoot(), items, prefs });
+    await refreshPushUI({ message: "On. Try “Send a test” to see one arrive.", kind: "good" });
+  } catch (err) {
+    await refreshPushUI({ message: err?.message || "That did not work.", kind: "bad" });
+  } finally {
+    pushBtn.disabled = false;
+  }
+});
+
+pushTestBtn.addEventListener("click", async () => {
+  pushTestBtn.disabled = true;
+  pushStatus("Sending…");
+  try {
+    await sendTestPush({ root: pushRoot() });
+    pushStatus("Sent. Lock your phone and it should arrive in a moment.", "good");
+  } catch (err) {
+    await refreshPushUI({ message: err?.message || "The test could not be sent.", kind: "bad" });
+  } finally {
+    pushTestBtn.disabled = false;
+  }
+});
+
+pushOffBtn.addEventListener("click", async () => {
+  pushOffBtn.disabled = true;
+  try {
+    await disablePush({ root: pushRoot() });
+  } finally {
+    pushOffBtn.disabled = false;
+    await refreshPushUI({ message: "Off. Alarms now only ring while the app is open." });
+  }
+});
+
+// Every edit changes what is owed, so the schedule is re-sent rather than
+// patched — it is small, the server replaces it wholesale, and anything
+// already delivered is remembered there so nothing rings twice.
+function queueAlarmSync() {
+  if (!pushOn) return;
+  clearTimeout(alarmSyncTimer);
+  alarmSyncTimer = setTimeout(() => {
+    syncAlarms({ root: pushRoot(), items, prefs }).catch(() => {
+      // Not worth interrupting anyone over: the next change tries again, and
+      // so does the next launch.
+    });
+  }, 2000);
+}
+
+if (canPush()) {
+  refreshPushUI().then(() => queueAlarmSync());
+} else {
+  refreshPushUI();
+}
+
 /* ---------- alarms ---------- */
 
 function fire({ item, kind }) {
@@ -560,7 +660,9 @@ function fire({ item, kind }) {
     alarm.stop();
     if (activeAlarm === alarm) activeAlarm = null;
   };
-  sendNotification("To Do Reminder", label, `${item.id}:${kind}`, { sticky: isDue });
+  // With push on, the service worker is already showing this one; a second
+  // notification from the page would be the same alert twice.
+  if (!pushOn) sendNotification("To Do Reminder", label, `${item.id}:${kind}`, { sticky: isDue });
   toast((isDue ? "⏰ " : "⏳ ") + label, {
     actions: [
       {

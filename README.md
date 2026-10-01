@@ -13,6 +13,7 @@ Live: https://todo-app-qpd5.onrender.com
 - Optional due date & time with priority (low / med / high)
 - **Repeating tasks** — daily, weekdays, weekly, monthly or yearly; ticking one off moves it to its next occurrence instead of closing it
 - **Pull in your calendar** — a published iCloud (or Google, or Outlook) calendar becomes tasks, and keeps up with changes made there
+- **Alarms that ring with the app closed** — real push notifications, scheduled a minute at a time by the companion Worker
 - **Eight alarm sounds** — Chime, Bell, Ping, Urgent, Marimba, Digital, Klaxon and Soft, all synthesized in-app (no audio files)
 - **Tap a sound to hear it** — the sound samples live behind the gear icon, as a row of chips you audition with one tap; per-task alarms preview as you pick them too
 - **The heads-up and the real alarm sound different**, so an early warning is never mistaken for a task actually being due
@@ -25,7 +26,22 @@ Live: https://todo-app-qpd5.onrender.com
 - Overdue tasks highlighted, due-soon tasks flagged
 - Saves to `localStorage` (survives refresh & close)
 
-The app's own alarms fire while the tab is open; iOS suspends its timers the moment you leave it. For a reminder that rings with the app closed, export to the calendar — see below.
+The app's own alarms fire while the tab is open; iOS suspends its timers the moment you leave it. Two things ring anyway: push notifications, and calendar alerts. Both are below.
+
+## Alarms when the app is closed
+
+Nothing a web page runs survives being closed — iOS suspends the page and its timers together. What survives is a push: sent by the companion service, delivered by Apple, shown by a service worker.
+
+Turn it on under the gear, in **Alarms when the app is closed**, then use **Send a test** to watch one arrive. Two conditions on iPhone, and the first catches everyone out:
+
+- **The app has to be on your Home Screen.** iOS only allows notifications from an installed app; in a Safari tab the APIs are all there and subscribing simply fails.
+- iOS 16.4 or newer.
+
+The app does the thinking and the service keeps the time. Whenever anything changes, the app sends the service a list of upcoming moments — a fortnight ahead, repeats expanded — and the service's clock posts whatever has come due. So the server never needs to understand recurrence or completion, and wiping it costs nothing: the next change rebuilds it.
+
+An alarm more than ten minutes late is dropped rather than delivered, on the grounds that a reminder arriving hours after the fact rings about something already passed.
+
+Setting the service up is a one-off, and free: see [`proxy/`](proxy/).
 
 ## Repeating tasks
 
@@ -98,6 +114,7 @@ npm run dev
 | `npm run preview` | Serve the production build locally |
 | `npm test` | Run the unit tests (Vitest) — app and proxy |
 | `npm start` | Run the calendar reader service locally |
+| `node proxy/vapid-keygen.mjs` | Make the push signing keys (once) |
 
 ## Deploy
 
@@ -120,4 +137,4 @@ cd proxy
 npx wrangler deploy
 ```
 
-Then paste the Worker's address, with `/ics` on the end, into **Reader service** in the settings panel. There is also a Render web service (`todo-cal-proxy`) running the Node version of the same thing, which works but sleeps when idle.
+Then paste the Worker's address, with `/ics` on the end, into **Reader service** in the settings panel. There is also a Render web service (`todo-cal-proxy`) running the Node version of the same thing, which serves the calendar but not push — push needs the Worker's database and its minute-by-minute cron.

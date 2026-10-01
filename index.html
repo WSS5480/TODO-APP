@@ -76,6 +76,8 @@
         </select>
       </label>
       <button class="ghost" id="notifyBtn" type="button">Enable notifications</button>
+      <button class="ghost" id="pushBtn" type="button"
+              title="Ring even when the app is closed">Alarms when closed</button>
         <button class="ghost" id="exportBtn" type="button"
                 title="Add every task with a due time to your calendar">Export to calendar</button>
       </div>
@@ -89,6 +91,18 @@
         <div class="sound-picker" id="soonSound" role="radiogroup" aria-label="Heads-up sound"></div>
       </div>
       <p class="sound-hint">Tap any sound to hear it.</p>
+
+      <!-- The app's own alarms stop the moment you leave it; iOS suspends the
+           page. A push sent from the reader service is the only thing that
+           rings with the app closed. -->
+      <div class="push-group">
+        <span class="sound-label">Alarms when the app is closed</span>
+        <p class="sound-hint" id="pushStatus">Checking…</p>
+        <div class="cal-row">
+          <button class="ghost" id="pushTestBtn" type="button" hidden>Send a test</button>
+          <button class="ghost" id="pushOffBtn" type="button" hidden>Turn off</button>
+        </div>
+      </div>
 
       <!-- Calendar: out to the phone's calendar, and back in from it. A web page
            cannot read the iPhone calendar directly — iOS only gives that to

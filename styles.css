@@ -488,3 +488,10 @@ button.toggle.on:hover { color: var(--good); border-color: var(--good); }
   align-items: center;
 }
 .cal-adv summary:hover { color: var(--ink); }
+
+/* ---- alarms when the app is closed ---- */
+.push-group {
+  margin: 14px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}

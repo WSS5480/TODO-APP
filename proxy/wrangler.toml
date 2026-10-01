@@ -2,8 +2,26 @@ name = "todo-cal-proxy"
 main = "worker.mjs"
 compatibility_date = "2026-09-01"
 
-# Only the app's own origin may read the response. Change this if the app moves
-# to another address, or set it to "*" to allow any.
+# Only the app's own origin may call this. Change it if the app moves, or set
+# it to "*" to allow any.
 [vars]
 ALLOWED_ORIGINS = "https://todo-app-qpd5.onrender.com"
 # EXTRA_HOSTS = "cal.example.com"   # another calendar provider, if ever needed
+
+# Where the push subscriptions and the alarm schedule live. Create it once with
+#
+#   npx wrangler d1 create todo-push
+#
+# and paste the database_id it prints below, then load the tables with
+#
+#   npx wrangler d1 execute todo-push --remote --file=./schema.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "todo-push"
+database_id = "PASTE_THE_ID_FROM_WRANGLER_D1_CREATE"
+
+# The alarm clock. Once a minute is the finest cron allows, and it is what lets
+# a reminder fire while the app is closed — nothing is running on the phone, so
+# something else has to be watching the time.
+[triggers]
+crons = ["* * * * *"]
